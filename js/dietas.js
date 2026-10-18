@@ -288,6 +288,7 @@ function abrirDetalle(dietaId, comidaId) {
     ` : ''}
   `;
 
+  lucide.createIcons();
   abrirModal('modalDetalle');
 }
 

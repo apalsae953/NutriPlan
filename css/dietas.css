@@ -340,6 +340,8 @@
   color: var(--color-text);
   margin-bottom: 16px;
   letter-spacing: -0.3px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .detalle-macros {
@@ -355,6 +357,8 @@
   padding: 12px;
   text-align: center;
   border: 1px solid var(--color-border-light);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .macro-valor {
@@ -362,6 +366,9 @@
   font-weight: 700;
   color: var(--color-text);
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .macro-label {
@@ -415,6 +422,8 @@
   padding: 8px 12px;
   background: var(--color-bg);
   border-radius: var(--radius-sm);
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .ingrediente-item::before {
@@ -435,6 +444,8 @@
   font-size: 14px;
   color: var(--color-text);
   line-height: 1.7;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* =========================================================
