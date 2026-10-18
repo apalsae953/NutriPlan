@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#2d8a55" />
+  <title>NutriPlan — Mis Dietas y Compra</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/dietas.css" />
+  <link rel="stylesheet" href="css/compra.css" />
+  <link rel="stylesheet" href="css/mobile.css" />
+  <!-- Iconos de Lucide (CDN libre) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================
+       BARRA LATERAL DE NAVEGACIÓN
+  ========================================================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <i data-lucide="leaf"></i>
+      </div>
+      <span class="logo-text">NutriPlan</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-view="dietas" onclick="cambiarVista('dietas', this)">
+        <i data-lucide="utensils"></i>
+        <span>Mis Dietas</span>
+      </button>
+      <button class="nav-item" data-view="compra" onclick="cambiarVista('compra', this)">
+        <i data-lucide="shopping-cart"></i>
+        <span>Lista de la Compra</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-info">
+        <i data-lucide="info"></i>
+        <span>v1.0.0</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- =========================================================
+       OVERLAY PARA MENÚ MÓVIL
+  ========================================================= -->
+  <div class="overlay" id="overlay" onclick="cerrarMenuMovil()"></div>
+
+  <!-- =========================================================
+       CONTENIDO PRINCIPAL
+  ========================================================= -->
+  <main class="main-content" id="mainContent">
+
+    <!-- Cabecera móvil -->
+    <header class="topbar">
+      <button class="topbar-menu-btn" onclick="abrirMenuMovil()">
+        <i data-lucide="menu"></i>
+      </button>
+      <div class="topbar-title" id="topbarTitle">Mis Dietas</div>
+      <div class="topbar-actions" id="topbarActions"></div>
+    </header>
+
+    <!-- =====================================================
+         VISTA: DIETAS
+    ===================================================== -->
+    <section class="view active" id="view-dietas">
+
+      <!-- Cabecera de la sección -->
+      <div class="section-header">
+        <div class="section-header-left">
+          <h1 class="section-title">Mis Dietas</h1>
+          <p class="section-subtitle">Gestiona y organiza tus planes de alimentación</p>
+        </div>
+        <button class="btn btn-primary" onclick="abrirModalNuevaDieta()">
+          <i data-lucide="plus"></i>
+          Nueva dieta
+        </button>
+      </div>
+
+      <!-- Buscador y filtros -->
+      <div class="filter-bar">
+        <div class="search-box">
+          <i data-lucide="search"></i>
+          <input type="text" id="buscarDieta" placeholder="Buscar dieta..." oninput="filtrarDietas()" />
+        </div>
+        <div class="filter-tabs" id="filtrosDia">
+          <button class="filter-tab active" data-dia="todos" onclick="filtrarPorDia('todos', this)">Todos</button>
+          <button class="filter-tab" data-dia="Lunes" onclick="filtrarPorDia('Lunes', this)">L</button>
+          <button class="filter-tab" data-dia="Martes" onclick="filtrarPorDia('Martes', this)">M</button>
+          <button class="filter-tab" data-dia="Miércoles" onclick="filtrarPorDia('Miércoles', this)">X</button>
+          <button class="filter-tab" data-dia="Jueves" onclick="filtrarPorDia('Jueves', this)">J</button>
+          <button class="filter-tab" data-dia="Viernes" onclick="filtrarPorDia('Viernes', this)">V</button>
+          <button class="filter-tab" data-dia="Sábado" onclick="filtrarPorDia('Sábado', this)">S</button>
+          <button class="filter-tab" data-dia="Domingo" onclick="filtrarPorDia('Domingo', this)">D</button>
+        </div>
+      </div>
+
+      <!-- Contenedor de dietas agrupadas por nombre de dieta -->
+      <div class="dietas-container" id="dietasContainer">
+        <!-- Generado dinámicamente por JS -->
+      </div>
+
+    </section>
+
+    <!-- =====================================================
+         VISTA: LISTA DE LA COMPRA
+    ===================================================== -->
+    <section class="view" id="view-compra">
+
+      <div class="section-header">
+        <div class="section-header-left">
+          <h1 class="section-title">Lista de la Compra</h1>
+          <p class="section-subtitle">Organiza tus ingredientes por categoría</p>
+        </div>
+        <div class="header-btn-group">
+          <button class="btn btn-outline" onclick="limpiarComprados()">
+            <i data-lucide="check-check"></i>
+            Limpiar marcados
+          </button>
+          <button class="btn btn-primary" onclick="abrirModalNuevoIngrediente()">
+            <i data-lucide="plus"></i>
+            Añadir
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumen rápido -->
+      <div class="compra-resumen" id="compraResumen">
+        <!-- Generado dinámicamente -->
+      </div>
+
+      <!-- Filtro de categorías -->
+      <div class="filter-bar compra-filter-bar">
+        <div class="search-box">
+          <i data-lucide="search"></i>
+          <input type="text" id="buscarIngrediente" placeholder="Buscar ingrediente..." oninput="filtrarIngredientes()" />
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="ordenarCompra()">
+          <i data-lucide="arrow-up-down"></i>
+          Ordenar
+        </button>
+      </div>
+
+      <!-- Listas agrupadas por categoría -->
+      <div class="compra-container" id="compraContainer">
+        <!-- Generado dinámicamente -->
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- =========================================================
+       MODAL: NUEVA / EDITAR DIETA
+  ========================================================= -->
+  <div class="modal-overlay" id="modalDieta">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalDietaTitulo">Nueva dieta</h2>
+        <button class="modal-close" onclick="cerrarModal('modalDieta')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="formDieta" onsubmit="guardarDieta(event)">
+
+          <!-- Nombre de la dieta -->
+          <div class="form-group">
+            <label class="form-label">Nombre de la dieta *</label>
+            <input class="form-input" type="text" id="dietaNombre" placeholder="Ej: Dieta de volumen mayo 2025" required />
+          </div>
+
+          <!-- Descripción -->
+          <div class="form-group">
+            <label class="form-label">Descripción</label>
+            <textarea class="form-input form-textarea" id="dietaDescripcion" placeholder="Objetivo, notas generales..."></textarea>
+          </div>
+
+          <!-- Separador: comidas -->
+          <div class="form-section-title">
+            <i data-lucide="calendar"></i>
+            Comidas de la semana
+          </div>
+
+          <!-- Acordeón de días -->
+          <div class="dias-accordion" id="diasAccordion">
+            <!-- Generado dinámicamente -->
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="cerrarModal('modalDieta')">Cancelar</button>
+        <button class="btn btn-primary" onclick="document.getElementById('formDieta').requestSubmit()">
+          <i data-lucide="save"></i>
+          Guardar dieta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: VER COMIDA (detalle expandido)
+  ========================================================= -->
+  <div class="modal-overlay" id="modalDetalle">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <span class="modal-badge" id="detalleBadgeDia"></span>
+          <span class="modal-badge badge-toma" id="detalleBadgeToma"></span>
+        </div>
+        <button class="modal-close" onclick="cerrarModal('modalDetalle')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" id="modalDetalleBody">
+        <!-- Contenido dinámico -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: NUEVO / EDITAR INGREDIENTE DE COMPRA
+  ========================================================= -->
+  <div class="modal-overlay" id="modalIngrediente">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalIngTitulo">Añadir ingrediente</h2>
+        <button class="modal-close" onclick="cerrarModal('modalIngrediente')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="formIngrediente" onsubmit="guardarIngrediente(event)">
+
+          <div class="form-group">
+            <label class="form-label">Nombre del ingrediente *</label>
+            <input class="form-input" type="text" id="ingNombre" placeholder="Ej: Pechuga de pollo" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Cantidad</label>
+              <input class="form-input" type="text" id="ingCantidad" placeholder="Ej: 500 g" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Categoría</label>
+              <select class="form-input form-select" id="ingCategoria">
+                <option value="Carnes y pescados">Carnes y pescados</option>
+                <option value="Lácteos y huevos">Lácteos y huevos</option>
+                <option value="Verduras y hortalizas">Verduras y hortalizas</option>
+                <option value="Legumbres y cereales">Legumbres y cereales</option>
+                <option value="Conservas">Conservas</option>
+                <option value="Condimentos y aceites">Condimentos y aceites</option>
+                <option value="Congelados">Congelados</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Notas (cómo dividirlo, consejos...)</label>
+            <textarea class="form-input form-textarea" id="ingNotas" placeholder="Ej: Congela en porciones de 150 g..."></textarea>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="cerrarModal('modalIngrediente')">Cancelar</button>
+        <button class="btn btn-primary" onclick="document.getElementById('formIngrediente').requestSubmit()">
+          <i data-lucide="save"></i>
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: CONFIRMAR ELIMINACIÓN
+  ========================================================= -->
+  <div class="modal-overlay" id="modalConfirmar">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">¿Eliminar?</h2>
+        <button class="modal-close" onclick="cerrarModal('modalConfirmar')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="confirmar-texto" id="confirmarTexto"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="cerrarModal('modalConfirmar')">Cancelar</button>
+        <button class="btn btn-danger" id="confirmarBtn">
+          <i data-lucide="trash-2"></i>
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       TOAST DE NOTIFICACIONES
+  ========================================================= -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="js/datos.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/dietas.js"></script>
+  <script src="js/compra.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- =========================================================
+       BARRA DE NAVEGACIÓN INFERIOR (solo móvil)
+  ========================================================= -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav-item active" data-view="dietas" onclick="cambiarVista('dietas', this)">
+      <i data-lucide="utensils"></i>
+      <span>Dietas</span>
+    </button>
+    <button class="bottom-nav-item" data-view="compra" onclick="cambiarVista('compra', this)">
+      <i data-lucide="shopping-cart"></i>
+      <span>Compra</span>
+    </button>
+  </nav>
+
+  <!-- Botón flotante de acción (FAB) — solo móvil -->
+  <button class="fab" id="fabBtn" onclick="accionFab()">
+    <i data-lucide="plus"></i>
+  </button>
+
+</body>
+</html>

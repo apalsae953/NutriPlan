@@ -1,0 +1,566 @@
+/* =========================================================
+   ESTILOS ESPECÍFICOS DE LA VISTA DE DIETAS
+   ========================================================= */
+
+/* Contenedor de grupos de dieta */
+.dietas-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* =========================================================
+   TARJETA DE GRUPO (una dieta = varios días)
+   ========================================================= */
+
+.dieta-grupo {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: var(--transition);
+  box-shadow: var(--shadow-xs);
+}
+
+.dieta-grupo:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Cabecera del grupo de dieta */
+.dieta-grupo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-border-light);
+  cursor: pointer;
+  user-select: none;
+  gap: 12px;
+}
+
+.dieta-grupo-header:hover .dieta-grupo-titulo {
+  color: var(--color-primary-dark);
+}
+
+.dieta-grupo-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dieta-grupo-icono {
+  width: 42px;
+  height: 42px;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.dieta-grupo-icono svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dieta-grupo-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dieta-grupo-titulo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.2px;
+  transition: var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dieta-grupo-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.dieta-grupo-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.dieta-grupo-meta-item svg {
+  width: 12px;
+  height: 12px;
+}
+
+.dieta-grupo-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: var(--transition);
+  font-family: var(--font-sans);
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-icon:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+.btn-icon.danger:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.chevron-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-light);
+  transition: transform .2s ease;
+  flex-shrink: 0;
+}
+
+.dieta-grupo.expandido .chevron-icon {
+  transform: rotate(180deg);
+}
+
+/* Cuerpo del grupo de dieta */
+.dieta-grupo-body {
+  display: none;
+}
+
+.dieta-grupo.expandido .dieta-grupo-body {
+  display: block;
+}
+
+/* =========================================================
+   DÍAS DENTRO DE UNA DIETA
+   ========================================================= */
+
+.dia-seccion {
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.dia-seccion:last-child {
+  border-bottom: none;
+}
+
+.dia-seccion-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: var(--transition);
+  user-select: none;
+}
+
+.dia-seccion-header:hover {
+  background: var(--color-primary-light);
+}
+
+.dia-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  flex-shrink: 0;
+}
+
+.dia-seccion-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.dia-seccion-total {
+  font-size: 13px;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+.dia-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-light);
+  transition: transform .2s ease;
+}
+
+.dia-seccion.abierta .dia-chevron {
+  transform: rotate(180deg);
+}
+
+.dia-comidas {
+  display: none;
+}
+
+.dia-seccion.abierta .dia-comidas {
+  display: block;
+}
+
+/* =========================================================
+   FILAS DE COMIDA
+   ========================================================= */
+
+.comida-fila {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--color-border-light);
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.comida-fila:hover {
+  background: var(--color-primary-light);
+}
+
+.comida-toma {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.comida-toma.almuerzo {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.comida-toma.cena {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.comida-toma.desayuno {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.comida-toma.merienda {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.comida-toma svg {
+  width: 12px;
+  height: 12px;
+}
+
+.comida-info {
+  min-width: 0;
+}
+
+.comida-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comida-preview {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.comida-kcal {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.comida-kcal-valor {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
+.comida-kcal-label {
+  font-size: 11px;
+  color: var(--color-text-light);
+}
+
+/* =========================================================
+   MODAL DETALLE DE COMIDA
+   ========================================================= */
+
+.detalle-plato {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 16px;
+  letter-spacing: -0.3px;
+}
+
+.detalle-macros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.macro-card {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  text-align: center;
+  border: 1px solid var(--color-border-light);
+}
+
+.macro-valor {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  display: block;
+}
+
+.macro-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-top: 2px;
+}
+
+.macro-card.kcal .macro-valor {
+  color: var(--color-primary-dark);
+}
+
+.detalle-seccion {
+  margin-bottom: 16px;
+}
+
+.detalle-seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 8px;
+}
+
+.detalle-seccion-titulo svg {
+  width: 13px;
+  height: 13px;
+  color: var(--color-primary);
+}
+
+.ingrediente-lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ingrediente-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.5;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+
+.ingrediente-item::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex-shrink: 0;
+  margin-top: 7px;
+}
+
+.detalle-preparacion {
+  background: var(--color-primary-light);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.7;
+}
+
+/* =========================================================
+   ACORDEÓN DEL FORMULARIO DE DIETA
+   ========================================================= */
+
+.dia-form-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.dia-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--color-bg);
+  cursor: pointer;
+  gap: 10px;
+  user-select: none;
+}
+
+.dia-form-header:hover {
+  background: var(--color-primary-light);
+}
+
+.dia-form-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.dia-form-body {
+  display: none;
+  padding: 16px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.dia-form-item.abierto .dia-form-body {
+  display: block;
+}
+
+.comida-form-bloque {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 12px;
+  position: relative;
+  background: var(--color-surface);
+}
+
+.comida-form-bloque-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.comida-form-bloque-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+
+.btn-add-comida {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px dashed var(--color-border);
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  width: 100%;
+  justify-content: center;
+  transition: var(--transition);
+  font-family: var(--font-sans);
+}
+
+.btn-add-comida:hover {
+  border-color: var(--color-primary-muted);
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light);
+}
+
+.btn-add-comida svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* =========================================================
+   CHIPS DE RESUMEN DE MACROS EN EL GRUPO
+   ========================================================= */
+
+.dieta-macros-resumen {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 22px;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.macro-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.macro-chip strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* Los estilos responsive de este módulo están en css/mobile.css */
