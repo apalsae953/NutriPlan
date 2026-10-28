@@ -1,7 +1,8 @@
 /* =========================================================
    MÓDULO DE DIETAS
    Gestiona la vista de dietas: renderizado, filtros,
-   modales de creación/edición y detalle de comidas.
+   modales de creación/edición, selección de platos creados
+   y detalle de comidas.
    ========================================================= */
 
 // Estado local del módulo
@@ -24,6 +25,8 @@ const TOMAS_CONFIG = {
 ------------------------------------------------------- */
 function renderizarDietas() {
   const container = document.getElementById('dietasContainer');
+  if (!container) return;
+
   let dietas = getDietas();
 
   // Aplicar filtro de texto
@@ -55,8 +58,14 @@ function renderizarDietas() {
         <div class="empty-state-icon">
           <i data-lucide="utensils"></i>
         </div>
-        <h3>Sin dietas guardadas</h3>
-        <p>Crea tu primera dieta con el botón "Nueva dieta" o usa los datos importados del Excel.</p>
+        <h3>No tienes ninguna dieta guardada</h3>
+        <p>Crea tu primera dieta personalizada o pulsa en "Cargar ejemplo" para ver cómo queda.</p>
+        <div class="header-btn-group" style="margin-top: 14px; justify-content: center;">
+          <button class="btn btn-outline btn-sm" onclick="cargarEjemplosCompletos()">
+            <i data-lucide="sparkles"></i>
+            Cargar dieta de ejemplo
+          </button>
+        </div>
       </div>
     `;
     lucide.createIcons();
@@ -226,13 +235,13 @@ function filtrarDietas() {
 
 function filtrarPorDia(dia, btn) {
   diaSeleccionado = dia;
-  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#filtrosDia .filter-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderizarDietas();
 }
 
 /* -------------------------------------------------------
-   Modal: ver detalle de una comida
+   Modal: ver detalle de una comida de la dieta
 ------------------------------------------------------- */
 function abrirDetalle(dietaId, comidaId) {
   const dieta  = getDietaPorId(dietaId);
@@ -240,27 +249,27 @@ function abrirDetalle(dietaId, comidaId) {
   const comida = dieta.comidas.find(c => c.id === comidaId);
   if (!comida) return;
 
-  document.getElementById('detalleBadgeDia').textContent  = comida.dia;
-  document.getElementById('detalleBadgeToma').textContent = comida.toma;
+  document.getElementById('detalleBadgeDia').textContent  = comida.dia || 'Día';
+  document.getElementById('detalleBadgeToma').textContent = comida.toma || 'Comida';
 
   document.getElementById('modalDetalleBody').innerHTML = `
     <h2 class="detalle-plato">${escapeHtml(comida.plato)}</h2>
 
     <div class="detalle-macros">
       <div class="macro-card kcal">
-        <span class="macro-valor">${comida.kcal || '—'}</span>
+        <span class="macro-valor">${comida.kcal || '0'}</span>
         <span class="macro-label">Calorías</span>
       </div>
       <div class="macro-card">
-        <span class="macro-valor">${comida.proteina || '—'}</span>
+        <span class="macro-valor">${escapeHtml(comida.proteina || '—')}</span>
         <span class="macro-label">Proteína</span>
       </div>
       <div class="macro-card">
-        <span class="macro-valor">${comida.carbos || '—'}</span>
+        <span class="macro-valor">${escapeHtml(comida.carbos || '—')}</span>
         <span class="macro-label">Carbos</span>
       </div>
       <div class="macro-card">
-        <span class="macro-valor">${comida.grasa || '—'}</span>
+        <span class="macro-valor">${escapeHtml(comida.grasa || '—')}</span>
         <span class="macro-label">Grasa</span>
       </div>
     </div>
@@ -339,16 +348,23 @@ function construirFormularioDias(porDia) {
         <div class="dia-form-header" onclick="toggleDiaForm('${dia}')">
           <div class="dia-pill">${dia.substring(0,2).toUpperCase()}</div>
           <span class="dia-form-nombre">${dia}</span>
+          <span class="dia-form-conteo" id="conteo_${dia}">${comidas.length} platos</span>
           <i data-lucide="chevron-down" class="dia-chevron"></i>
         </div>
         <div class="dia-form-body" id="formDiaBody_${dia}">
           <div class="comidas-form-lista" id="comidasLista_${dia}">
             ${comidas.map(c => renderizarComidaFormBloque(c, dia)).join('')}
           </div>
-          <button type="button" class="btn-add-comida" onclick="agregarComidaForm('${dia}')">
-            <i data-lucide="plus"></i>
-            Añadir comida
-          </button>
+          <div class="btn-group-add-comida">
+            <button type="button" class="btn-add-comida" onclick="agregarComidaForm('${dia}')">
+              <i data-lucide="plus"></i>
+              Añadir plato en blanco
+            </button>
+            <button type="button" class="btn-add-comida btn-add-guardada" onclick="abrirModalSeleccionarComidaGuardada('${dia}')">
+              <i data-lucide="chef-hat"></i>
+              Cargar de mis platos
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -365,7 +381,7 @@ function renderizarComidaFormBloque(comida, dia) {
   return `
     <div class="comida-form-bloque" id="bloque_${id}" data-comida-id="${id}" data-dia="${dia}">
       <div class="comida-form-bloque-titulo">
-        <span class="comida-form-bloque-label">Comida</span>
+        <span class="comida-form-bloque-label">Plato / Comida</span>
         <button type="button" class="btn-icon danger" onclick="eliminarComidaForm('${id}')">
           <i data-lucide="x"></i>
         </button>
@@ -373,7 +389,7 @@ function renderizarComidaFormBloque(comida, dia) {
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Toma</label>
+          <label class="form-label">Toma del día</label>
           <select class="form-input form-select" data-campo="toma">
             ${['Desayuno','Almuerzo','Merienda','Cena'].map(t =>
               `<option value="${t}" ${comida.toma === t ? 'selected' : ''}>${t}</option>`
@@ -381,22 +397,22 @@ function renderizarComidaFormBloque(comida, dia) {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Plato</label>
+          <label class="form-label">Nombre del plato</label>
           <input class="form-input" type="text" data-campo="plato" value="${escapeHtml(comida.plato || '')}" placeholder="Nombre del plato" />
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Ingredientes (uno por línea)</label>
-        <textarea class="form-input form-textarea" data-campo="ingredientes" placeholder="200 g lentejas de bote&#10;150 g pechuga de pollo">${(comida.ingredientes || []).join('\n')}</textarea>
+        <label class="form-label">Ingredientes y pesos (uno por línea)</label>
+        <textarea class="form-input form-textarea" data-campo="ingredientes" placeholder="200 g lentejas de bote&#10;150 g pechuga de pollo&#10;5 ml aceite de oliva">${(comida.ingredientes || []).join('\n')}</textarea>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Preparación</label>
+        <label class="form-label">Preparación rápida</label>
         <textarea class="form-input form-textarea" data-campo="preparacion" placeholder="Pasos de preparación...">${escapeHtml(comida.preparacion || '')}</textarea>
       </div>
 
-      <div class="form-row">
+      <div class="form-row form-row-macros">
         <div class="form-group">
           <label class="form-label">Calorías (kcal)</label>
           <input class="form-input" type="number" data-campo="kcal" value="${comida.kcal || ''}" placeholder="455" min="0" />
@@ -435,7 +451,17 @@ function agregarComidaForm(dia) {
   const bloque = document.createElement('div');
   bloque.innerHTML = renderizarComidaFormBloque({ id, toma: 'Almuerzo' }, dia);
   lista.appendChild(bloque.firstElementChild);
+  actualizarConteoDia(dia);
   lucide.createIcons();
+}
+
+function actualizarConteoDia(dia) {
+  const lista = document.getElementById(`comidasLista_${dia}`);
+  const label = document.getElementById(`conteo_${dia}`);
+  if (lista && label) {
+    const total = lista.querySelectorAll('.comida-form-bloque').length;
+    label.textContent = `${total} ${total === 1 ? 'plato' : 'platos'}`;
+  }
 }
 
 /* -------------------------------------------------------
@@ -443,7 +469,101 @@ function agregarComidaForm(dia) {
 ------------------------------------------------------- */
 function eliminarComidaForm(id) {
   const el = document.getElementById(`bloque_${id}`);
-  if (el) el.remove();
+  if (el) {
+    const dia = el.dataset.dia;
+    el.remove();
+    if (dia) actualizarConteoDia(dia);
+  }
+}
+
+/* -------------------------------------------------------
+   Modal para elegir platos guardados y meterlos en la dieta
+------------------------------------------------------- */
+let diaDestinoPlato = null;
+
+function abrirModalSeleccionarComidaGuardada(dia) {
+  diaDestinoPlato = dia;
+  const listaGuardadas = getComidas();
+  const contenedor = document.getElementById('selectorComidasLista');
+
+  document.getElementById('selectorComidasDiaNombre').textContent = dia;
+
+  if (listaGuardadas.length === 0) {
+    contenedor.innerHTML = `
+      <div class="empty-state" style="padding: 24px 12px;">
+        <i data-lucide="cooking-pot" style="width:36px;height:36px;color:var(--color-primary);margin-bottom:10px;"></i>
+        <p>Aún no has creado platos en la sección "Comidas".</p>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:12px;" onclick="cerrarModal('modalSelectorComida'); cambiarVista('comidas'); abrirModalNuevaComida();">
+          <i data-lucide="plus"></i> Crear mi primer plato
+        </button>
+      </div>
+    `;
+    lucide.createIcons();
+    abrirModal('modalSelectorComida');
+    return;
+  }
+
+  contenedor.innerHTML = listaGuardadas.map(c => {
+    const ingsTexto = (c.ingredientesDetallados || []).map(i => i.peso ? `${i.peso} ${i.nombre}` : i.nombre).join(', ');
+    return `
+      <div class="selector-comida-item" onclick="insertarComidaGuardadaEnDieta('${c.id}')">
+        <div class="selector-comida-left">
+          <span class="comida-toma ${(TOMAS_CONFIG[c.toma] || TOMAS_CONFIG['Almuerzo']).clase}">
+            ${escapeHtml(c.toma || 'Almuerzo')}
+          </span>
+          <div class="selector-comida-info">
+            <strong>${escapeHtml(c.nombre)}</strong>
+            <span class="selector-comida-preview">${escapeHtml(ingsTexto || 'Sin ingredientes')}</span>
+          </div>
+        </div>
+        <div class="selector-comida-right">
+          <span class="comida-kcal-valor">${c.kcal || 0} kcal</span>
+          <button type="button" class="btn btn-primary btn-sm">
+            <i data-lucide="plus"></i>
+            Añadir
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  lucide.createIcons();
+  abrirModal('modalSelectorComida');
+}
+
+function insertarComidaGuardadaEnDieta(comidaId) {
+  if (!diaDestinoPlato) return;
+  const comida = getComidaPorId(comidaId);
+  if (!comida) return;
+
+  const lista = document.getElementById(`comidasLista_${diaDestinoPlato}`);
+  const id = generarId('c');
+
+  // Convertir los ingredientes estructurados en lista de texto para la dieta
+  const ingredientes = (comida.ingredientesDetallados || []).map(i => {
+    return i.peso ? `${i.peso} ${i.nombre}` : i.nombre;
+  });
+
+  const bloque = document.createElement('div');
+  bloque.innerHTML = renderizarComidaFormBloque({
+    id,
+    dia: diaDestinoPlato,
+    toma: comida.toma || 'Almuerzo',
+    plato: comida.nombre || '',
+    ingredientes,
+    preparacion: comida.preparacion || '',
+    kcal: comida.kcal || 0,
+    proteina: comida.proteina || '',
+    carbos: comida.carbos || '',
+    grasa: comida.grasa || ''
+  }, diaDestinoPlato);
+
+  lista.appendChild(bloque.firstElementChild);
+  actualizarConteoDia(diaDestinoPlato);
+  lucide.createIcons();
+
+  cerrarModal('modalSelectorComida');
+  mostrarToast(`"${comida.nombre}" añadido al ${diaDestinoPlato}`, 'success');
 }
 
 /* -------------------------------------------------------

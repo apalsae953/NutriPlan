@@ -7,10 +7,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#2d8a55" />
-  <title>NutriPlan — Mis Dietas y Compra</title>
+  <title>NutriPlan — Mis Dietas, Comidas y Partidas Compartidas</title>
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/dietas.css" />
+  <link rel="stylesheet" href="css/comidas.css" />
   <link rel="stylesheet" href="css/compra.css" />
+  <link rel="stylesheet" href="css/partidas.css" />
   <link rel="stylesheet" href="css/mobile.css" />
   <!-- Iconos de Lucide (CDN libre) -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -18,7 +20,7 @@
 <body>
 
   <!-- =========================================================
-       BARRA LATERAL DE NAVEGACIÓN
+       BARRA LATERAL DE NAVEGACIÓN (Escritorio / Tablet)
   ========================================================= -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
@@ -28,10 +30,17 @@
       <span class="logo-text">NutriPlan</span>
     </div>
 
+    <!-- Módulo de cuenta / partida en sidebar -->
+    <div id="sidebarCuentaInfo"></div>
+
     <nav class="sidebar-nav">
       <button class="nav-item active" data-view="dietas" onclick="cambiarVista('dietas', this)">
-        <i data-lucide="utensils"></i>
+        <i data-lucide="calendar"></i>
         <span>Mis Dietas</span>
+      </button>
+      <button class="nav-item" data-view="comidas" onclick="cambiarVista('comidas', this)">
+        <i data-lucide="cooking-pot"></i>
+        <span>Mis Comidas</span>
       </button>
       <button class="nav-item" data-view="compra" onclick="cambiarVista('compra', this)">
         <i data-lucide="shopping-cart"></i>
@@ -42,7 +51,7 @@
     <div class="sidebar-footer">
       <div class="sidebar-footer-info">
         <i data-lucide="info"></i>
-        <span>v1.0.0</span>
+        <span>NutriPlan v1.2.0 • Compartido</span>
       </div>
     </div>
   </aside>
@@ -57,17 +66,25 @@
   ========================================================= -->
   <main class="main-content" id="mainContent">
 
-    <!-- Cabecera móvil -->
+    <!-- Cabecera móvil y tablet -->
     <header class="topbar">
       <button class="topbar-menu-btn" onclick="abrirMenuMovil()">
         <i data-lucide="menu"></i>
       </button>
       <div class="topbar-title" id="topbarTitle">Mis Dietas</div>
-      <div class="topbar-actions" id="topbarActions"></div>
+      <div class="topbar-actions" id="topbarActions">
+        <div id="topbarCuentaInfo"></div>
+      </div>
     </header>
 
+    <!-- Banner de Partida Activa / Compartida -->
+    <div id="bannerPartidaActiva" style="display: none;"></div>
+
+    <!-- Banner global para control de datos de ejemplo opcionales -->
+    <div class="banner-ejemplos-contenedor" id="bannerEjemplos" style="display: none;"></div>
+
     <!-- =====================================================
-         VISTA: DIETAS
+         VISTA 1: DIETAS
     ===================================================== -->
     <section class="view active" id="view-dietas">
 
@@ -75,19 +92,25 @@
       <div class="section-header">
         <div class="section-header-left">
           <h1 class="section-title">Mis Dietas</h1>
-          <p class="section-subtitle">Gestiona y organiza tus planes de alimentación</p>
+          <p class="section-subtitle">Organiza tus planes de alimentación por días y comidas</p>
         </div>
-        <button class="btn btn-primary" onclick="abrirModalNuevaDieta()">
-          <i data-lucide="plus"></i>
-          Nueva dieta
-        </button>
+        <div class="header-btn-group">
+          <button class="btn btn-outline" onclick="cargarEjemplosCompletos()">
+            <i data-lucide="sparkles"></i>
+            Ejemplo
+          </button>
+          <button class="btn btn-primary" onclick="abrirModalNuevaDieta()">
+            <i data-lucide="plus"></i>
+            Nueva dieta
+          </button>
+        </div>
       </div>
 
-      <!-- Buscador y filtros -->
+      <!-- Buscador y filtros por día -->
       <div class="filter-bar">
         <div class="search-box">
           <i data-lucide="search"></i>
-          <input type="text" id="buscarDieta" placeholder="Buscar dieta..." oninput="filtrarDietas()" />
+          <input type="text" id="buscarDieta" placeholder="Buscar en mis dietas..." oninput="filtrarDietas()" />
         </div>
         <div class="filter-tabs" id="filtrosDia">
           <button class="filter-tab active" data-dia="todos" onclick="filtrarPorDia('todos', this)">Todos</button>
@@ -101,22 +124,65 @@
         </div>
       </div>
 
-      <!-- Contenedor de dietas agrupadas por nombre de dieta -->
-      <div class="dietas-container" id="dietasContainer">
-        <!-- Generado dinámicamente por JS -->
-      </div>
+      <!-- Contenedor dinámico de dietas -->
+      <div class="dietas-container" id="dietasContainer"></div>
 
     </section>
 
     <!-- =====================================================
-         VISTA: LISTA DE LA COMPRA
+         VISTA 2: COMIDAS (PLATOS INDEPENDIENTES)
+    ===================================================== -->
+    <section class="view" id="view-comidas">
+
+      <div class="section-header">
+        <div class="section-header-left">
+          <h1 class="section-title">Mis Comidas</h1>
+          <p class="section-subtitle">Crea y clasifica tus platos con ingredientes, pesos y preparación</p>
+        </div>
+        <div class="header-btn-group">
+          <button class="btn btn-outline" onclick="cambiarOrdenComidas()">
+            <i data-lucide="arrow-up-down"></i>
+            Ordenar
+          </button>
+          <button class="btn btn-primary" onclick="abrirModalNuevaComida()">
+            <i data-lucide="plus"></i>
+            Nueva comida
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumen estadístico de platos -->
+      <div class="compra-resumen" id="comidasResumen"></div>
+
+      <!-- Buscador y filtro por toma -->
+      <div class="filter-bar">
+        <div class="search-box">
+          <i data-lucide="search"></i>
+          <input type="text" id="buscarComidasInput" placeholder="Buscar por plato, ingrediente o tipo..." oninput="filtrarComidasTexto()" />
+        </div>
+        <div class="filter-tabs" id="filtrosComidaCategoria">
+          <button class="filter-tab active" data-cat="todas" onclick="filtrarComidasCategoria('todas', this)">Todas</button>
+          <button class="filter-tab" data-cat="Almuerzo" onclick="filtrarComidasCategoria('Almuerzo', this)">Almuerzos</button>
+          <button class="filter-tab" data-cat="Cena" onclick="filtrarComidasCategoria('Cena', this)">Cenas</button>
+          <button class="filter-tab" data-cat="Desayuno" onclick="filtrarComidasCategoria('Desayuno', this)">Desayunos</button>
+          <button class="filter-tab" data-cat="Merienda" onclick="filtrarComidasCategoria('Merienda', this)">Meriendas</button>
+        </div>
+      </div>
+
+      <!-- Contenedor dinámico de la cuadrícula de comidas -->
+      <div class="comidas-container" id="comidasContainer"></div>
+
+    </section>
+
+    <!-- =====================================================
+         VISTA 3: LISTA DE LA COMPRA
     ===================================================== -->
     <section class="view" id="view-compra">
 
       <div class="section-header">
         <div class="section-header-left">
           <h1 class="section-title">Lista de la Compra</h1>
-          <p class="section-subtitle">Organiza tus ingredientes por categoría</p>
+          <p class="section-subtitle">Organiza tus ingredientes por categoría y márcalos en el súper</p>
         </div>
         <div class="header-btn-group">
           <button class="btn btn-outline" onclick="limpiarComprados()">
@@ -125,21 +191,19 @@
           </button>
           <button class="btn btn-primary" onclick="abrirModalNuevoIngrediente()">
             <i data-lucide="plus"></i>
-            Añadir
+            Añadir ingrediente
           </button>
         </div>
       </div>
 
-      <!-- Resumen rápido -->
-      <div class="compra-resumen" id="compraResumen">
-        <!-- Generado dinámicamente -->
-      </div>
+      <!-- Resumen rápido de compra -->
+      <div class="compra-resumen" id="compraResumen"></div>
 
-      <!-- Filtro de categorías -->
+      <!-- Buscador de ingredientes -->
       <div class="filter-bar compra-filter-bar">
         <div class="search-box">
           <i data-lucide="search"></i>
-          <input type="text" id="buscarIngrediente" placeholder="Buscar ingrediente..." oninput="filtrarIngredientes()" />
+          <input type="text" id="buscarIngrediente" placeholder="Buscar ingrediente en la compra..." oninput="filtrarIngredientes()" />
         </div>
         <button class="btn btn-outline btn-sm" onclick="ordenarCompra()">
           <i data-lucide="arrow-up-down"></i>
@@ -148,13 +212,192 @@
       </div>
 
       <!-- Listas agrupadas por categoría -->
-      <div class="compra-container" id="compraContainer">
-        <!-- Generado dinámicamente -->
-      </div>
+      <div class="compra-container" id="compraContainer"></div>
 
     </section>
 
   </main>
+
+  <!-- =========================================================
+       MODAL: GESTIÓN DE PARTIDAS (ESPACIOS DE DIETAS)
+  ========================================================= -->
+  <div class="modal-overlay" id="modalGestionPartidas">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Mis Partidas</h2>
+          <p class="selector-comidas-subtitulo" style="margin: 0;">Organiza planes independientes para ti, tu familia o amigos</p>
+        </div>
+        <button class="modal-close" onclick="cerrarModal('modalGestionPartidas')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="partidas-modal-header-actions">
+          <button class="btn btn-primary btn-sm" onclick="abrirModalCrearPartida()">
+            <i data-lucide="plus"></i>
+            Nueva partida
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="abrirModalImportarPartida()">
+            <i data-lucide="download"></i>
+            Importar con enlace o código
+          </button>
+          <label class="btn btn-outline btn-sm" style="cursor: pointer; margin: 0;">
+            <i data-lucide="file-up"></i>
+            Subir archivo
+            <input type="file" accept=".nutriplan,.json" style="display: none;" onchange="procesarSubirArchivo(event)" />
+          </label>
+        </div>
+
+        <div class="partidas-lista-scroll" id="modalPartidasLista"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: CREAR PARTIDA
+  ========================================================= -->
+  <div class="modal-overlay" id="modalCrearPartida">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">Crear nueva partida</h2>
+        <button class="modal-close" onclick="cerrarModal('modalCrearPartida')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="formCrearPartida" onsubmit="procesarCrearPartida(event)">
+          <div class="form-group">
+            <label class="form-label">Nombre de la partida *</label>
+            <input class="form-input" type="text" id="nuevaPartidaNombre" placeholder="Ej: Dieta Pareja, Menú Piso, Definición..." required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descripción (opcional)</label>
+            <textarea class="form-input form-textarea" id="nuevaPartidaDesc" placeholder="Objetivo de este espacio, notas generales..."></textarea>
+          </div>
+          <div class="modal-footer" style="padding: 12px 0 0; margin-top: 10px;">
+            <button type="button" class="btn btn-ghost" onclick="cerrarModal('modalCrearPartida')">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              <i data-lucide="sparkles"></i>
+              Crear partida
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: COMPARTIR PARTIDA (ENLACE / CÓDIGO)
+  ========================================================= -->
+  <div class="modal-overlay" id="modalCompartirPartida">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Compartir partida</h2>
+          <p class="selector-comidas-subtitulo" id="compartirPartidaTitulo" style="margin: 0; font-weight: 600; color: var(--color-primary);"></p>
+        </div>
+        <button class="modal-close" onclick="cerrarModal('modalCompartirPartida')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="compartir-info-box">
+          <i data-lucide="users" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 4px;"></i>
+          Cualquier persona con este enlace o código entrará directamente a tu misma partida. <strong>Podrán editar la compra, añadir comidas y modificar dietas juntos en tiempo real y sin crear cuentas</strong>.
+        </div>
+
+        <div style="text-align: center; margin: 12px 0 16px; padding: 14px; background: var(--color-bg); border: 1.5px dashed var(--color-primary); border-radius: var(--radius-md);">
+          <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Código de la partida</span>
+          <span id="compartirCodigoLabel" style="font-family: var(--font-mono); font-size: 26px; font-weight: 800; letter-spacing: 4px; color: var(--color-primary-dark);">------</span>
+        </div>
+
+        <label class="form-label">Enlace directo para compartir</label>
+        <div class="compartir-input-group">
+          <input type="text" class="form-input" id="compartirEnlaceInput" readonly />
+          <button class="btn btn-primary btn-sm" onclick="copiarEnlaceGenerado()">
+            <i data-lucide="copy"></i>
+            Copiar enlace
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <button class="btn btn-outline btn-sm btn-block" onclick="copiarCodigoGenerado()">
+            <i data-lucide="hash"></i>
+            Copiar solo código
+          </button>
+        </div>
+        <input type="hidden" id="compartirCodigoInput" />
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: UNIRSE A PARTIDA (PEGAR ENLACE O CÓDIGO)
+  ========================================================= -->
+  <div class="modal-overlay" id="modalImportarPartida">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">Unirse a una partida</h2>
+        <button class="modal-close" onclick="cerrarModal('modalImportarPartida')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="formImportarPartida" onsubmit="procesarImportarPegado(event)">
+          <div class="form-group">
+            <label class="form-label">Introduce el código (6 letras) o pega el enlace recibido</label>
+            <input class="form-input" type="text" id="importarCodigoInput" placeholder="Ej: CASA24 o enlace completo" style="font-size: 16px; font-family: var(--font-mono); text-transform: uppercase;" required />
+          </div>
+          <p class="confirmar-texto" style="font-size: 12.5px; margin-bottom: 14px;">
+            Al unirte, compartirás la misma lista de la compra, comidas y dietas para editarlas en común. No necesitas crear cuenta.
+          </p>
+          <div class="modal-footer" style="padding: 12px 0 0;">
+            <button type="button" class="btn btn-ghost" onclick="cerrarModal('modalImportarPartida')">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              <i data-lucide="wifi"></i>
+              Unirme a la partida
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: PARTIDA RECIBIDA POR ENLACE DIRECTO (URL)
+  ========================================================= -->
+  <div class="modal-overlay" id="modalPartidaRecibida">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 class="modal-title">¡Partida recibida!</h2>
+        <button class="modal-close" onclick="cerrarModal('modalPartidaRecibida')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="recibida-preview-card">
+          <div class="recibida-preview-title" id="recibidaNombre">Partida Compartida</div>
+          <p class="recibida-preview-desc" id="recibidaDesc"></p>
+          <div class="recibida-preview-badges">
+            <span class="recibida-badge"><i data-lucide="calendar"></i> <span id="recibidaDietasCount">0 dietas</span></span>
+            <span class="recibida-badge"><i data-lucide="cooking-pot"></i> <span id="recibidaComidasCount">0 platos</span></span>
+            <span class="recibida-badge"><i data-lucide="shopping-cart"></i> <span id="recibidaCompraCount">0 ingr.</span></span>
+          </div>
+        </div>
+        <p class="confirmar-texto" style="font-size: 13px; margin-bottom: 14px;">
+          ¿Deseas añadir esta partida a tu aplicación? Podrás consultarla, editarla y cambiar entre tus partidas en cualquier momento.
+        </p>
+        <div class="modal-footer" style="padding: 0;">
+          <button type="button" class="btn btn-ghost" onclick="cerrarModal('modalPartidaRecibida')">Descartar</button>
+          <button type="button" class="btn btn-primary" onclick="aceptarPartidaRecibida()">
+            <i data-lucide="check"></i>
+            Añadir a mis partidas
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- =========================================================
        MODAL: NUEVA / EDITAR DIETA
@@ -173,25 +416,23 @@
           <!-- Nombre de la dieta -->
           <div class="form-group">
             <label class="form-label">Nombre de la dieta *</label>
-            <input class="form-input" type="text" id="dietaNombre" placeholder="Ej: Dieta de volumen mayo 2025" required />
+            <input class="form-input" type="text" id="dietaNombre" placeholder="Ej: Dieta de definición mayo" required />
           </div>
 
           <!-- Descripción -->
           <div class="form-group">
             <label class="form-label">Descripción</label>
-            <textarea class="form-input form-textarea" id="dietaDescripcion" placeholder="Objetivo, notas generales..."></textarea>
+            <textarea class="form-input form-textarea" id="dietaDescripcion" placeholder="Objetivo, duración, notas generales..."></textarea>
           </div>
 
           <!-- Separador: comidas -->
           <div class="form-section-title">
             <i data-lucide="calendar"></i>
-            Comidas de la semana
+            Planificación semanal
           </div>
 
           <!-- Acordeón de días -->
-          <div class="dias-accordion" id="diasAccordion">
-            <!-- Generado dinámicamente -->
-          </div>
+          <div class="dias-accordion" id="diasAccordion"></div>
 
         </form>
       </div>
@@ -206,7 +447,120 @@
   </div>
 
   <!-- =========================================================
-       MODAL: VER COMIDA (detalle expandido)
+       MODAL: SELECCIONAR COMIDA GUARDADA PARA DIETA
+  ========================================================= -->
+  <div class="modal-overlay" id="modalSelectorComida">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Elegir plato para el <span id="selectorComidasDiaNombre"></span></h2>
+          <p class="selector-comidas-subtitulo">Selecciona un plato de tu colección para añadirlo a este día:</p>
+        </div>
+        <button class="modal-close" onclick="cerrarModal('modalSelectorComida')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="selector-comidas-lista" id="selectorComidasLista"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="cerrarModal('modalSelectorComida')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: NUEVA / EDITAR COMIDA (PLATO)
+  ========================================================= -->
+  <div class="modal-overlay" id="modalComida">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalComidaTitulo">Crear nueva comida</h2>
+        <button class="modal-close" onclick="cerrarModal('modalComida')">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="formComida" onsubmit="guardarComidaForm(event)">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nombre del plato *</label>
+              <input class="form-input" type="text" id="comidaFormNombre" placeholder="Ej: Pollo al curry con arroz" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Toma recomendada</label>
+              <select class="form-input form-select" id="comidaFormToma">
+                <option value="Almuerzo">Almuerzo</option>
+                <option value="Cena">Cena</option>
+                <option value="Desayuno">Desayuno</option>
+                <option value="Merienda">Merienda</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Sección de ingredientes detallados -->
+          <div class="ingredientes-dinamicos-header">
+            <div class="form-section-title" style="margin: 0; border: none; padding: 0;">
+              <i data-lucide="shopping-basket"></i>
+              Ingredientes y tipos
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="agregarFilaIngredienteComida()">
+              <i data-lucide="plus"></i>
+              Añadir ingrediente
+            </button>
+          </div>
+          <p class="form-label" style="text-transform: none; font-weight: normal; margin-bottom: 8px;">
+            Indica el ingrediente, su peso exacto (opcional) y clasifícalo (congelado, especia, fresco, etc.):
+          </p>
+
+          <div class="ingredientes-dinamicos-lista" id="comidaFormIngredientesLista"></div>
+
+          <!-- Preparación -->
+          <div class="form-group" style="margin-top: 14px;">
+            <label class="form-label">Cómo se prepara</label>
+            <textarea class="form-input form-textarea" id="comidaFormPreparacion" placeholder="Explica los pasos de cocinado, tiempos de sartén, horno o microondas..."></textarea>
+          </div>
+
+          <!-- Macros nutricionales -->
+          <div class="form-section-title">
+            <i data-lucide="activity"></i>
+            Información nutricional aproximada (opcional)
+          </div>
+
+          <div class="form-row form-row-macros">
+            <div class="form-group">
+              <label class="form-label">Calorías (kcal)</label>
+              <input class="form-input" type="number" id="comidaFormKcal" placeholder="Ej: 420" min="0" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Proteína</label>
+              <input class="form-input" type="text" id="comidaFormProteina" placeholder="Ej: 35 g" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Carbohidratos</label>
+              <input class="form-input" type="text" id="comidaFormCarbos" placeholder="Ej: 40 g" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Grasas</label>
+              <input class="form-input" type="text" id="comidaFormGrasa" placeholder="Ej: 10 g" />
+            </div>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="cerrarModal('modalComida')">Cancelar</button>
+        <button class="btn btn-primary" onclick="document.getElementById('formComida').requestSubmit()">
+          <i data-lucide="save"></i>
+          Guardar comida
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: VER DETALLE (PLATO O COMIDA DE DIETA)
   ========================================================= -->
   <div class="modal-overlay" id="modalDetalle">
     <div class="modal">
@@ -219,9 +573,7 @@
           <i data-lucide="x"></i>
         </button>
       </div>
-      <div class="modal-body" id="modalDetalleBody">
-        <!-- Contenido dinámico -->
-      </div>
+      <div class="modal-body" id="modalDetalleBody"></div>
     </div>
   </div>
 
@@ -265,8 +617,8 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Notas (cómo dividirlo, consejos...)</label>
-            <textarea class="form-input form-textarea" id="ingNotas" placeholder="Ej: Congela en porciones de 150 g..."></textarea>
+            <label class="form-label">Notas (cómo dividirlo, congelación, consejos...)</label>
+            <textarea class="form-input form-textarea" id="ingNotas" placeholder="Ej: Congela en paquetes individuales..."></textarea>
           </div>
 
         </form>
@@ -275,7 +627,7 @@
         <button class="btn btn-ghost" onclick="cerrarModal('modalIngrediente')">Cancelar</button>
         <button class="btn btn-primary" onclick="document.getElementById('formIngrediente').requestSubmit()">
           <i data-lucide="save"></i>
-          Guardar
+          Guardar ingrediente
         </button>
       </div>
     </div>
@@ -287,7 +639,7 @@
   <div class="modal-overlay" id="modalConfirmar">
     <div class="modal modal-sm">
       <div class="modal-header">
-        <h2 class="modal-title">¿Eliminar?</h2>
+        <h2 class="modal-title">¿Eliminar elemento?</h2>
         <button class="modal-close" onclick="cerrarModal('modalConfirmar')">
           <i data-lucide="x"></i>
         </button>
@@ -310,20 +662,17 @@
   ========================================================= -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Scripts -->
-  <script src="js/datos.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/dietas.js"></script>
-  <script src="js/compra.js"></script>
-  <script src="js/app.js"></script>
-
   <!-- =========================================================
-       BARRA DE NAVEGACIÓN INFERIOR (solo móvil)
+       BARRA DE NAVEGACIÓN INFERIOR (Móvil)
   ========================================================= -->
   <nav class="bottom-nav" id="bottomNav">
     <button class="bottom-nav-item active" data-view="dietas" onclick="cambiarVista('dietas', this)">
-      <i data-lucide="utensils"></i>
+      <i data-lucide="calendar"></i>
       <span>Dietas</span>
+    </button>
+    <button class="bottom-nav-item" data-view="comidas" onclick="cambiarVista('comidas', this)">
+      <i data-lucide="cooking-pot"></i>
+      <span>Comidas</span>
     </button>
     <button class="bottom-nav-item" data-view="compra" onclick="cambiarVista('compra', this)">
       <i data-lucide="shopping-cart"></i>
@@ -331,10 +680,19 @@
     </button>
   </nav>
 
-  <!-- Botón flotante de acción (FAB) — solo móvil -->
+  <!-- Botón flotante de acción (FAB) — móvil -->
   <button class="fab" id="fabBtn" onclick="accionFab()">
     <i data-lucide="plus"></i>
   </button>
+
+  <!-- Scripts -->
+  <script src="js/datos.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/dietas.js"></script>
+  <script src="js/comidas.js"></script>
+  <script src="js/compra.js"></script>
+  <script src="js/partidas.js"></script>
+  <script src="js/app.js"></script>
 
 </body>
 </html>

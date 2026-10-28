@@ -1,18 +1,31 @@
 /* =========================================================
    APP.JS — Inicialización y utilidades globales
    Controla la navegación, modales, toasts, FAB y funciones
-   de ayuda compartidas entre módulos.
+   de ayuda compartidas entre módulos (Dietas, Comidas, Compra).
    ========================================================= */
 
-// Vista activa en este momento
+// Vista activa en este momento (dietas | comidas | compra)
 let vistaActual = 'dietas';
 
 /* -------------------------------------------------------
    Arranque de la aplicación
 ------------------------------------------------------- */
-document.addEventListener('DOMContentLoaded', () => {
-  // Inicializar almacenamiento (carga datos del Excel si es la primera vez)
+document.addEventListener('DOMContentLoaded', async () => {
+  // Inicializar almacenamiento y partidas locales
   inicializarStorage();
+
+  // Actualizar indicadores de interfaz de partida activa (sidebar y topbar)
+  if (typeof actualizarUIPartidas === 'function') {
+    actualizarUIPartidas();
+  }
+
+  // Comprobar si se ha accedido mediante enlace con código de partida (?partida=CASA24)
+  if (typeof verificarParametroPartidaURL === 'function') {
+    await verificarParametroPartidaURL();
+  }
+
+  // Actualizar banner superior de ejemplos si procede
+  actualizarBannerEjemplos();
 
   // Renderizar la vista inicial
   renderizarDietas();
@@ -23,6 +36,53 @@ document.addEventListener('DOMContentLoaded', () => {
   // Configurar swipe para cambiar de vista en móvil
   configurarSwipe();
 });
+
+/* -------------------------------------------------------
+   Banner / Control de datos de ejemplo opcionales
+------------------------------------------------------- */
+function actualizarBannerEjemplos() {
+  const banner = document.getElementById('bannerEjemplos');
+  if (!banner) return;
+
+  const hayEjemplos = localStorage.getItem(STORAGE_KEYS.ejemplosCargados) === 'true';
+  const dietasCount = getDietas().length;
+  const comidasCount = getComidas().length;
+  const compraCount = getCompra().length;
+
+  if (hayEjemplos) {
+    banner.innerHTML = `
+      <div class="banner-ejemplo activo">
+        <div class="banner-ejemplo-texto">
+          <i data-lucide="sparkles"></i>
+          <span>Estás viendo los <strong>datos de ejemplo</strong> del sistema. Puedes limpiarlos en cualquier momento para empezar de cero.</span>
+        </div>
+        <button class="btn btn-sm btn-ghost-danger" onclick="limpiarDatosEjemplo()">
+          <i data-lucide="trash-2"></i>
+          Limpiar ejemplos
+        </button>
+      </div>
+    `;
+    banner.style.display = 'block';
+  } else if (dietasCount === 0 && comidasCount === 0 && compraCount === 0) {
+    banner.innerHTML = `
+      <div class="banner-ejemplo aviso">
+        <div class="banner-ejemplo-texto">
+          <i data-lucide="info"></i>
+          <span>Tu aplicación está vacía y lista para usar. Si quieres ver un menú semanal y lista de compra de prueba, pulsa cargar.</span>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="cargarEjemplosCompletos()">
+          <i data-lucide="sparkles"></i>
+          Cargar ejemplos
+        </button>
+      </div>
+    `;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  lucide.createIcons();
+}
 
 /* -------------------------------------------------------
    Navegación entre vistas
@@ -39,9 +99,8 @@ function cambiarVista(vista, btn) {
   if (viewEl) viewEl.classList.add('active');
 
   // Actualizar nav activo en SIDEBAR (escritorio)
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  // Activar el botón del sidebar correspondiente a la vista
-  const sidebarBtn = document.querySelector(`.nav-item[data-view="${vista}"]`);
+  document.querySelectorAll('.sidebar .nav-item').forEach(b => b.classList.remove('active'));
+  const sidebarBtn = document.querySelector(`.sidebar .nav-item[data-view="${vista}"]`);
   if (sidebarBtn) sidebarBtn.classList.add('active');
 
   // Actualizar BOTTOM NAV (móvil)
@@ -49,20 +108,22 @@ function cambiarVista(vista, btn) {
   const bottomBtn = document.querySelector(`.bottom-nav-item[data-view="${vista}"]`);
   if (bottomBtn) bottomBtn.classList.add('active');
 
-  // Si el clic viene del sidebar, no duplicar la activación
   if (btn) btn.classList.add('active');
 
   // Actualizar título del topbar móvil
   const titulos = {
     dietas: 'Mis Dietas',
+    comidas: 'Mis Comidas',
     compra: 'Lista de la Compra'
   };
   const topbarTitle = document.getElementById('topbarTitle');
-  if (topbarTitle) topbarTitle.textContent = titulos[vista] || '';
+  if (topbarTitle) topbarTitle.textContent = titulos[vista] || 'NutriPlan';
 
   // Renderizar la vista correspondiente
   if (vista === 'dietas') {
     renderizarDietas();
+  } else if (vista === 'comidas') {
+    renderizarComidas();
   } else if (vista === 'compra') {
     renderizarCompra();
   }
@@ -81,6 +142,8 @@ function cambiarVista(vista, btn) {
 function accionFab() {
   if (vistaActual === 'dietas') {
     abrirModalNuevaDieta();
+  } else if (vistaActual === 'comidas') {
+    abrirModalNuevaComida();
   } else if (vistaActual === 'compra') {
     abrirModalNuevoIngrediente();
   }
@@ -166,7 +229,6 @@ document.addEventListener('keydown', (e) => {
 
 /* -------------------------------------------------------
    Swipe horizontal para cambiar entre vistas (móvil)
-   Desliza izquierda/derecha para ir de Dietas a Compra
 ------------------------------------------------------- */
 function configurarSwipe() {
   let touchStartX = 0;
@@ -178,21 +240,22 @@ function configurarSwipe() {
   }, { passive: true });
 
   document.addEventListener('touchend', (e) => {
-    // No procesar si hay modal abierto
     if (document.querySelector('.modal-overlay.active')) return;
 
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
 
-    // Solo activar si el gesto es más horizontal que vertical
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.5) return;
 
-    if (dx < 0 && vistaActual === 'dietas') {
-      // Deslizar izquierda: ir a Compra
-      cambiarVista('compra', null);
-    } else if (dx > 0 && vistaActual === 'compra') {
-      // Deslizar derecha: ir a Dietas
-      cambiarVista('dietas', null);
+    const vistasOrden = ['dietas', 'comidas', 'compra'];
+    const idx = vistasOrden.indexOf(vistaActual);
+
+    if (dx < 0 && idx < vistasOrden.length - 1) {
+      // Hacia la izquierda -> siguiente vista
+      cambiarVista(vistasOrden[idx + 1], null);
+    } else if (dx > 0 && idx > 0) {
+      // Hacia la derecha -> vista anterior
+      cambiarVista(vistasOrden[idx - 1], null);
     }
   }, { passive: true });
 }
@@ -202,6 +265,8 @@ function configurarSwipe() {
 ------------------------------------------------------- */
 function mostrarToast(mensaje, tipo = 'success') {
   const container = document.getElementById('toastContainer');
+  if (!container) return;
+
   const iconos = {
     success: 'check-circle',
     error:   'x-circle',

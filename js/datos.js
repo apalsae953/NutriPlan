@@ -1,21 +1,198 @@
 /* =========================================================
-   DATOS INICIALES — IMPORTADOS DEL EXCEL DEL USUARIO
+   DATOS INICIALES — PLANTILLAS DE EJEMPLO
    Contiene la dieta semanal de lunes a viernes con macros,
-   ingredientes y preparaciones, más la lista de la compra
-   organizada por categorías.
+   ingredientes y preparaciones, la lista de la compra y el
+   catálogo de comidas preparadas para precargar si el usuario lo desea.
    ========================================================= */
 
 const DATOS_INICIALES = {
 
   /* -----------------------------------------------------------
-     DIETAS
-     Cada objeto representa una "dieta guardada" con un nombre,
-     descripción y un array de comidas agrupadas por día.
+     CATÁLOGO DE COMIDAS / PLATOS DE EJEMPLO
+     Cada plato contiene sus ingredientes clasificados (tipo),
+     pesos (opcionales), preparación detallada y macros.
+  ----------------------------------------------------------- */
+  comidas: [
+    {
+      id: 'comida_ej_1',
+      nombre: 'Lentejas salteadas con pollo',
+      toma: 'Almuerzo',
+      preparacion: 'Dora el pollo con la cebolla y zanahoria picadas, añade pimentón y saltea con las lentejas lavadas 3 min.',
+      kcal: 455,
+      proteina: '48 g',
+      carbos: '42 g',
+      grasa: '9 g',
+      ingredientesDetallados: [
+        { nombre: 'Lentejas de bote (medio bote)', peso: '200 g', tipo: 'Conservas' },
+        { nombre: 'Pechuga de pollo en dados', peso: '150 g', tipo: 'Carne fresca' },
+        { nombre: 'Cebolla', peso: '50 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Zanahoria', peso: '50 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Aceite de oliva virgen extra', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Ajo en polvo y pimentón', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_2',
+      nombre: 'Tortilla de atún y ensalada fresca',
+      toma: 'Cena',
+      preparacion: 'Haz la tortilla con los 2 huevos y el atún escurrido. Acompaña con el tomate picado y la zanahoria aliñada con limón y orégano.',
+      kcal: 355,
+      proteina: '32 g',
+      carbos: '10 g',
+      grasa: '19 g',
+      ingredientesDetallados: [
+        { nombre: 'Huevos talla M/L', peso: '2 uds', tipo: 'Huevos / Lácteos' },
+        { nombre: 'Atún al natural (media lata escurrida)', peso: '30 g', tipo: 'Conservas' },
+        { nombre: 'Tomate de ensalada', peso: '150 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Zanahoria rallada', peso: '50 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Aceite de oliva virgen extra', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Zumo de limón y orégano', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_3',
+      nombre: 'Macarrones boloñesa en déficit',
+      toma: 'Almuerzo',
+      preparacion: 'Cuece la pasta. Sofríe la carne con el calabacín picado fino (da mucho volumen sin calorías) y añade el tomate triturado y orégano.',
+      kcal: 485,
+      proteina: '43 g',
+      carbos: '52 g',
+      grasa: '11 g',
+      ingredientesDetallados: [
+        { nombre: 'Macarrones integrales', peso: '65 g (crudo)', tipo: 'Legumbres / Cereales' },
+        { nombre: 'Carne picada de pollo/pavo', peso: '150 g', tipo: 'Carne fresca' },
+        { nombre: 'Calabacín (picado muy fino)', peso: '150 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Tomate natural triturado', peso: '150 g', tipo: 'Conservas' },
+        { nombre: 'Aceite de oliva', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Ajo en polvo y orégano', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_4',
+      nombre: 'Lomo al ajillo con brócoli',
+      toma: 'Cena',
+      preparacion: 'Cocina el brócoli 4 min al microondas o vapor sin descongelar. Marca el lomo a la plancha a fuego vivo y saltea todo con ajo y perejil.',
+      kcal: 335,
+      proteina: '37 g',
+      carbos: '8 g',
+      grasa: '16 g',
+      ingredientesDetallados: [
+        { nombre: 'Cinta de lomo de cerdo fresco', peso: '160 g', tipo: 'Carne fresca' },
+        { nombre: 'Brócoli ultracongelado', peso: '200 g', tipo: 'Congelados' },
+        { nombre: 'Aceite de oliva virgen extra', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Ajo en polvo y perejil', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_5',
+      nombre: 'Pollo con patata y verdura a la plancha',
+      toma: 'Almuerzo',
+      preparacion: 'Pincha la patata con un tenedor y cocínala 6 min al microondas a máxima potencia con piel. Haz los filetes de pollo y la verdura a la plancha con sal y pimienta.',
+      kcal: 430,
+      proteina: '42 g',
+      carbos: '36 g',
+      grasa: '11 g',
+      ingredientesDetallados: [
+        { nombre: 'Pechuga de pollo fileteada', peso: '160 g', tipo: 'Carne fresca' },
+        { nombre: 'Patata mediana con piel', peso: '150 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Calabacín y cebolla', peso: '200 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Aceite de oliva', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Sal y pimienta negra', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_6',
+      nombre: 'Revuelto de espinacas y atún',
+      toma: 'Cena',
+      preparacion: 'Saltea las espinacas en la sartén hasta que pierdan el agua, añade el atún escurrido y cuaja los 2 huevos removiendo a fuego medio.',
+      kcal: 350,
+      proteina: '37 g',
+      carbos: '5 g',
+      grasa: '19 g',
+      ingredientesDetallados: [
+        { nombre: 'Huevos talla M/L', peso: '2 uds', tipo: 'Huevos / Lácteos' },
+        { nombre: 'Atún al natural escurrido', peso: '90 g', tipo: 'Conservas' },
+        { nombre: 'Espinacas ultracongeladas', peso: '150 g', tipo: 'Congelados' },
+        { nombre: 'Aceite de oliva virgen extra', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Ajo en polvo', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_7',
+      nombre: 'Arroz a la cubana fit',
+      toma: 'Almuerzo',
+      preparacion: 'Cuece el arroz. Pasa las salchichas y el huevo a la plancha con unas gotas de aceite. Calienta el tomate con orégano y sirve junto.',
+      kcal: 540,
+      proteina: '39 g',
+      carbos: '54 g',
+      grasa: '17 g',
+      ingredientesDetallados: [
+        { nombre: 'Arroz en grano', peso: '60 g (crudo)', tipo: 'Legumbres / Cereales' },
+        { nombre: 'Salchichas frescas de pollo/pavo', peso: '150 g (3 uds)', tipo: 'Carne fresca' },
+        { nombre: 'Huevo talla M/L', peso: '1 ud', tipo: 'Huevos / Lácteos' },
+        { nombre: 'Tomate natural triturado', peso: '150 g', tipo: 'Conservas' },
+        { nombre: 'Aceite de oliva y orégano', peso: '5 ml', tipo: 'Aceites y grasas' }
+      ]
+    },
+    {
+      id: 'comida_ej_8',
+      nombre: 'Merluza al limón con verde',
+      toma: 'Cena',
+      preparacion: 'Cocina los filetes de merluza a la plancha 3 min por lado con limón y perejil picado. Acompaña con el brócoli o espinacas al vapor.',
+      kcal: 270,
+      proteina: '36 g',
+      carbos: '8 g',
+      grasa: '9 g',
+      ingredientesDetallados: [
+        { nombre: 'Filetes de merluza sin piel', peso: '200 g', tipo: 'Pescado / Marisco fresco' },
+        { nombre: 'Brócoli o espinacas congeladas', peso: '200 g', tipo: 'Congelados' },
+        { nombre: 'Zumo de limón natural', peso: '', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Aceite de oliva y perejil', peso: '5 ml', tipo: 'Aceites y grasas' }
+      ]
+    },
+    {
+      id: 'comida_ej_9',
+      nombre: 'Salteado de legumbres y lomo',
+      toma: 'Almuerzo',
+      preparacion: 'Saltea las tiras de lomo con la cebolla a fuego fuerte. Añade una cucharadita de pimentón dulce y las legumbres escurridas 3 min.',
+      kcal: 450,
+      proteina: '44 g',
+      carbos: '38 g',
+      grasa: '12 g',
+      ingredientesDetallados: [
+        { nombre: 'Lentejas o garbanzos cocidos', peso: '200 g', tipo: 'Conservas' },
+        { nombre: 'Cinta de lomo de cerdo en tiras', peso: '150 g', tipo: 'Carne fresca' },
+        { nombre: 'Cebolla picada', peso: '50 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Aceite de oliva virgen extra', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Ajo y pimentón dulce de la Vera', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    },
+    {
+      id: 'comida_ej_10',
+      nombre: 'Hamburguesa casera con huevo y tomate',
+      toma: 'Cena',
+      preparacion: 'Salpimienta la carne picada, dale forma de hamburguesa y hazla a la plancha con el huevo encima. Sirve con tomate en rodajas y orégano.',
+      kcal: 380,
+      proteina: '38 g',
+      carbos: '7 g',
+      grasa: '21 g',
+      ingredientesDetallados: [
+        { nombre: 'Carne picada de pollo/pavo', peso: '150 g', tipo: 'Carne fresca' },
+        { nombre: 'Huevo talla M/L', peso: '1 ud', tipo: 'Huevos / Lácteos' },
+        { nombre: 'Tomate de ensalada en rodajas', peso: '150 g', tipo: 'Verdura / Hortaliza fresca' },
+        { nombre: 'Aceite de oliva virgen extra', peso: '5 ml', tipo: 'Aceites y grasas' },
+        { nombre: 'Sal, pimienta y orégano', peso: '', tipo: 'Especias y condimentos' }
+      ]
+    }
+  ],
+
+  /* -----------------------------------------------------------
+     DIETAS DE EJEMPLO
   ----------------------------------------------------------- */
   dietas: [
     {
       id: 'dieta_1',
-      nombre: 'Dieta de déficit L-V',
+      nombre: 'Dieta de déficit L-V (Ejemplo)',
       descripcion: 'Dieta semanal de lunes a viernes orientada al déficit calórico. Cada comida se prepara en menos de 15 minutos.',
       fechaCreacion: '2025-05-01',
       comidas: [
@@ -40,7 +217,7 @@ const DATOS_INICIALES = {
           id: 'c2',
           dia: 'Lunes',
           toma: 'Cena',
-          plato: 'Tortilla de atún y ensalada',
+          plato: 'Tortilla de atún y ensalada fresca',
           ingredientes: [
             '2 huevos talla M/L',
             '30 g atún al natural (media lata escurrida)',
@@ -91,7 +268,7 @@ const DATOS_INICIALES = {
           id: 'c5',
           dia: 'Miércoles',
           toma: 'Almuerzo',
-          plato: 'Pollo con patata y verdura',
+          plato: 'Pollo con patata y verdura a la plancha',
           ingredientes: [
             '160 g pechuga de pollo fileteada',
             '150 g patata mediana (con piel, lavada)',
@@ -176,7 +353,7 @@ const DATOS_INICIALES = {
           id: 'c10',
           dia: 'Viernes',
           toma: 'Cena',
-          plato: 'Hamburguesa casera con huevo',
+          plato: 'Hamburguesa casera con huevo y tomate',
           ingredientes: [
             '150 g carne picada de pollo/pavo',
             '1 huevo talla M/L',
@@ -194,9 +371,7 @@ const DATOS_INICIALES = {
   ],
 
   /* -----------------------------------------------------------
-     LISTA DE LA COMPRA
-     Agrupada por categoría, con cantidad semanal y notas
-     sobre cómo dividir el producto al llegar del supermercado.
+     LISTA DE LA COMPRA DE EJEMPLO
   ----------------------------------------------------------- */
   compra: [
     {

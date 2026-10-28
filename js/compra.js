@@ -121,8 +121,14 @@ function renderizarListaCompra() {
         <div class="empty-state-icon">
           <i data-lucide="shopping-cart"></i>
         </div>
-        <h3>Lista vacía</h3>
-        <p>Añade ingredientes con el botón "Añadir" o importa los de tu dieta.</p>
+        <h3>Tu lista de la compra está vacía</h3>
+        <p>Añade ingredientes con el botón "Añadir" o pulsa en "Cargar ejemplo" para ver la lista de prueba.</p>
+        <div class="header-btn-group" style="margin-top: 14px; justify-content: center;">
+          <button class="btn btn-outline btn-sm" onclick="cargarEjemplosCompletos()">
+            <i data-lucide="sparkles"></i>
+            Cargar lista de compra de ejemplo
+          </button>
+        </div>
       </div>
     `;
     lucide.createIcons();
