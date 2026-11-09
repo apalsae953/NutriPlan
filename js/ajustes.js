@@ -24,7 +24,7 @@ function abrirAjustes() {
           ${yo.nombre ? htmlAvatarMiembro(yo) : `<span class="avatar avatar-vacio">${ico('personas')}</span>`}
           <span class="fila-texto">
             <span class="fila-titulo">${yo.nombre ? esc(yo.nombre) : 'Pon tu nombre'}</span>
-            <span class="fila-detalle">Así te ven en tus familias</span>
+            <span class="fila-detalle">Tu nombre de siempre. En cada familia puedes usar otro</span>
           </span>
           ${ico('chevron_der', 'ico-final')}
         </button>

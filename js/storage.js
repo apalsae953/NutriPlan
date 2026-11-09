@@ -29,7 +29,7 @@ const STORAGE_KEYS = {
   compraLegacy:     'nutriplan_compra'
 };
 
-const VERSION_APP = '3.4.0';
+const VERSION_APP = '3.5.0';
 
 // Colecciones de cada familia que se sincronizan
 const COLECCIONES = ['dietas', 'comidas', 'compra', 'rapida', 'historial', 'miembros'];
@@ -243,24 +243,55 @@ function getYo() {
   return yo;
 }
 
+// Tu nombre general: el que se usa en las familias donde no has puesto otro
 function setMiNombre(nombre) {
   setPref('yo', { ...getYo(), nombre: String(nombre || '').trim().slice(0, 40) });
   getFamilias().forEach(f => asegurarMiembro(f.id));
+}
+
+/*
+  Cada familia puede verte con un nombre distinto («Papá» en casa,
+  «Antonio» en el piso). Se guarda solo en este dispositivo, en la
+  propia familia (miNombre); lo que ven los demás es tu fila de
+  miembros, que sí se sincroniza.
+*/
+function nombreEn(id = getFamiliaActivaId()) {
+  const f = getFamiliaPorId(id);
+  return (f && f.miNombre) || getYo().nombre;
+}
+
+// Ajusta miNombre sin guardar: igual que el general (o vacío) = sin nombre propio
+function fijarMiNombre(f, nombre) {
+  const limpio = String(nombre || '').trim().slice(0, 40);
+  if (!limpio || limpio === getYo().nombre) delete f.miNombre;
+  else f.miNombre = limpio;
+}
+
+function setMiNombreEnFamilia(id, nombre) {
+  const f = getFamiliaPorId(id);
+  const limpio = String(nombre || '').trim();
+  if (!f || !limpio) return;
+  // Si aún no tenías nombre, este pasa a ser también el general
+  if (!getYo().nombre) setMiNombre(limpio);
+  fijarMiNombre(f, limpio);
+  guardarFamilias();
+  asegurarMiembro(id);
 }
 
 // Me añade a la familia (o actualiza mi nombre) si hace falta
 function asegurarMiembro(id = getFamiliaActivaId()) {
   const yo = getYo();
   const f = getFamiliaPorId(id);
-  if (!yo.nombre || !f) return;
+  const nombre = nombreEn(id);
+  if (!nombre || !f) return;
   const miembros = f.miembros || [];
   const yoAhi = miembros.find(m => m.id === yo.id);
-  if (yoAhi && yoAhi.nombre === yo.nombre) return;
+  if (yoAhi && yoAhi.nombre === nombre) return;
 
   actualizarFamilia(id, {
     miembros: yoAhi
-      ? miembros.map(m => (m.id === yo.id ? { ...m, nombre: yo.nombre } : m))
-      : [...miembros, { id: yo.id, nombre: yo.nombre, unidoEn: Date.now() }]
+      ? miembros.map(m => (m.id === yo.id ? { ...m, nombre } : m))
+      : [...miembros, { id: yo.id, nombre, unidoEn: Date.now() }]
   });
 }
 
@@ -862,7 +893,7 @@ function unirListas(base, local, remoto, borrados) {
   la pone al día juntando las dos copias.
   Devuelve { familia, nueva }.
 */
-function incorporarDesdeEnlace(datos) {
+function incorporarDesdeEnlace(datos, miNombre) {
   const familias = getFamilias();
   let p = familias.find(x => x.codigo === datos.codigo);
   const nueva = !p;
@@ -890,6 +921,7 @@ function incorporarDesdeEnlace(datos) {
     p.pendiente = false;
     familias.unshift(p);
   }
+  if (miNombre) fijarMiNombre(p, miNombre);
 
   setFamilias(familias);
   setFamiliaActivaId(p.id);
@@ -1000,8 +1032,9 @@ async function obtenerSala(codigo) {
   return sala;
 }
 
-// Añade (o actualiza) la sala en la lista local y la activa
-function incorporarSala(sala) {
+// Añade (o actualiza) la sala en la lista local y la activa.
+// miNombre: cómo quieres que te vean en ella (opcional)
+function incorporarSala(sala, miNombre) {
   const familias = getFamilias();
   let p = familias.find(x => x.codigo === sala.codigo);
 
@@ -1022,6 +1055,7 @@ function incorporarSala(sala) {
     p.pendiente = false;
     familias.unshift(p);
   }
+  if (miNombre) fijarMiNombre(p, miNombre);
 
   setFamilias(familias);
   setFamiliaActivaId(p.id);

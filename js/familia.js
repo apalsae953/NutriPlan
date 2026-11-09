@@ -105,7 +105,7 @@ function abrirFamilia() {
               ${m.unidoEn ? `<span class="fila-detalle">Desde el ${esc(new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' }).format(m.unidoEn))}</span>` : ''}
             </span>
             ${m.id === yo.id
-              ? `<button class="boton-icono pequeno" data-minombre aria-label="Cambiar mi nombre" title="Cambiar mi nombre">${ico('editar')}</button>`
+              ? `<button class="boton-icono pequeno" data-nombre-familia aria-label="Cambiar cómo te ven en esta familia" title="Cambiar cómo te ven aquí">${ico('editar')}</button>`
               : `<button class="boton-icono pequeno" data-miembro="${esc(m.id)}" aria-label="Opciones de ${esc(m.nombre)}">${ico('mas_h')}</button>`}
           </div>
         `).join('')}
@@ -165,6 +165,7 @@ function abrirFamilia() {
   en('[data-x="ajustes"]', () => abrirAjustes());
   en('[data-x="salir"]', () => salirDeFamilia(activa.id));
   en('[data-minombre]', () => abrirMiNombre());
+  en('[data-nombre-familia]', () => abrirNombreEnFamilia(activa.id));
   en('[data-miembro]', (el) => menuMiembro(el.dataset.miembro));
   en('[data-cambiar]', (el) => cambiarAFamilia(el.dataset.cambiar));
   en('[data-menu]', (el) => menuFamilia(el.dataset.menu));
@@ -268,19 +269,80 @@ function menuMiembro(id) {
   });
 }
 
-function htmlCampoNombre(autofocus = false) {
+function htmlCampoNombre(autofocus = false, { etiqueta = 'Tu nombre', valor = getYo().nombre, ayuda = '' } = {}) {
   return `
     <label class="campo">
-      <span class="campo-etiqueta">Tu nombre</span>
-      <input class="entrada" name="minombre" required maxlength="40" value="${esc(getYo().nombre)}" placeholder="Así te verán los demás" autocomplete="given-name" autocapitalize="words" ${autofocus ? 'autofocus' : ''} />
+      <span class="campo-etiqueta">${esc(etiqueta)}</span>
+      <input class="entrada" name="minombre" required maxlength="40" value="${esc(valor)}" placeholder="Así te verán los demás" autocomplete="given-name" autocapitalize="words" ${autofocus ? 'autofocus' : ''} />
+      ${ayuda ? `<span class="campo-ayuda">${esc(ayuda)}</span>` : ''}
     </label>
   `;
 }
 
+// Lo que se explica bajo el campo de "cómo te ven en esta familia"
+function ayudaNombreFamilia(idFamilia = null) {
+  const base = 'Puede ser distinto en cada familia, como «Papá» o «Tía Ana».';
+  const otras = getFamilias().filter(f => f.id !== idFamilia && f.codigo);
+  if (!otras.length || !getYo().nombre) return base;
+  // Cómo te ven en las demás (con su nombre si en alguna eres distinto)
+  const nombres = [...new Set(otras.map(f => nombreEn(f.id)))];
+  if (nombres.length === 1) return `${base} En ${otras.length === 1 ? `«${otras[0].nombre}»` : 'las demás'} eres «${nombres[0]}».`;
+  return `${base} ${otras.slice(0, 3).map(f => `En «${f.nombre}» eres «${nombreEn(f.id)}»`).join('; ')}.`;
+}
+
+/*
+  Cómo te ven en una familia concreta. Con recienUnido se
+  ofrece justo después de entrar, con el nombre ya puesto.
+*/
+function abrirNombreEnFamilia(id, { recienUnido = false } = {}) {
+  const f = getFamiliaPorId(id);
+  if (!f) return;
+  Hoja.abrir({
+    titulo: recienUnido ? `Ya estás en «${f.nombre}»` : `Tu nombre en «${f.nombre}»`,
+    subtitulo: recienUnido ? '¿Cómo quieres que te vean aquí?' : 'Así te ven los de esta familia',
+    cuerpo: `<form id="formNombreFamilia" novalidate>${htmlCampoNombre(!recienUnido, {
+      etiqueta: 'Nombre en esta familia',
+      valor: nombreEn(id),
+      ayuda: ayudaNombreFamilia(id)
+    })}</form>`,
+    pie: `
+      <button type="button" class="boton boton-secundario" data-cerrar-hoja>${recienUnido ? 'Dejarlo así' : 'Cancelar'}</button>
+      <button type="submit" form="formNombreFamilia" class="boton boton-primario">Guardar</button>
+    `,
+    alAbrir: (d) => {
+      const form = d.querySelector('form');
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const nombre = form.minombre.value.trim();
+        if (!nombre) return form.minombre.focus();
+        const antes = nombreEn(id);
+        setMiNombreEnFamilia(id, nombre);
+        Hoja.cerrar(d);
+        refrescarApp();
+        if (nombreEn(id) !== antes) aviso(`En «${f.nombre}» te verán como ${nombreEn(id)}`);
+      });
+    }
+  });
+}
+
+// Tras unirse, en cuanto no quede ninguna hoja abierta (la de unirse se está cerrando)
+function preguntarNombreAlUnirse(id) {
+  let intentos = 0;
+  const probar = () => {
+    if (Hoja.hayAbiertas()) {
+      if (intentos++ < 25) setTimeout(probar, 200);
+      return;
+    }
+    abrirNombreEnFamilia(id, { recienUnido: true });
+  };
+  setTimeout(probar, 350);
+}
+
 function abrirMiNombre() {
+  const conNombrePropio = getFamilias().some(f => f.miNombre);
   Hoja.abrir({
     titulo: 'Tu nombre',
-    subtitulo: 'Es como te verán en todas tus familias',
+    subtitulo: conNombrePropio ? 'Se usa en las familias donde no has puesto otro' : 'Es como te verán en tus familias',
     cuerpo: `<form id="formMiNombre" novalidate>${htmlCampoNombre(true)}</form>`,
     pie: `
       <button type="button" class="boton boton-secundario" data-cerrar-hoja>Cancelar</button>
@@ -317,7 +379,7 @@ async function prepararEnlace(id) {
 }
 
 function textoInvitacion(f, enlace) {
-  const quien = getYo().nombre;
+  const quien = nombreEn(f.id);
   const invita = `${quien ? `${quien} te invita` : 'Te invitan'} a «${f.nombre}» en NutriPlan`;
   return sincronizable(f)
     ? `${invita} para compartir la compra, las recetas y las dietas de la semana:\n${enlace}\n\nO entra con el código ${f.codigo}`
@@ -590,21 +652,26 @@ async function entrarDesdeEnlace(dato) {
   return unirseConDatos(datos);
 }
 
-function unirseConDatos(datos) {
+// miNombre: cómo te verán en ella. Si no se ha preguntado, se pregunta al entrar.
+function unirseConDatos(datos, miNombre) {
   const yaLaTenia = getFamilias().find(f => f.codigo === datos.codigo);
   if (yaLaTenia && sincronizable(yaLaTenia)) {
     cambiarAFamilia(yaLaTenia.id);
     return true;
   }
 
-  const { familia, nueva } = incorporarDesdeEnlace(datos);
+  const { familia, nueva } = incorporarDesdeEnlace(datos, miNombre);
   if (nueva) quitarFamiliaInicialVacia();
   diaPlan = indiceHoy();
   refrescarApp();
 
+  if (nueva && !miNombre) {
+    preguntarNombreAlUnirse(familia.id);
+    return true;
+  }
   const quien = datos.de && datos.de !== getYo().id ? nombreMiembro(datos.de) : '';
   aviso(nueva
-    ? `Ya estás en «${familia.nombre}»`
+    ? `Ya estás en «${familia.nombre}» como ${nombreEn(familia.id)}`
     : `«${familia.nombre}» al día${quien ? ` con lo que ha mandado ${quien}` : ''}. No se ha perdido nada tuyo.`, { duracion: 4000 });
   return true;
 }
@@ -636,12 +703,18 @@ function abrirUnirme() {
   });
 }
 
-function entrarEnSala(sala) {
-  const f = incorporarSala(sala);
+// miNombre: cómo te verán en ella. Si no se ha preguntado, se pregunta al entrar.
+function entrarEnSala(sala, miNombre) {
+  const nueva = !getFamilias().some(x => x.codigo === sala.codigo);
+  const f = incorporarSala(sala, miNombre);
   quitarFamiliaInicialVacia();
   diaPlan = indiceHoy();
   refrescarApp();
-  aviso(`Ya estás en «${f.nombre}». Lo que hagáis se verá en todos los móviles.`);
+  if (nueva && !miNombre) {
+    preguntarNombreAlUnirse(f.id);
+    return;
+  }
+  aviso(`Ya estás en «${f.nombre}» como ${nombreEn(f.id)}. Lo que hagáis se verá en todos los móviles.`, { duracion: 4000 });
 }
 
 /* -------------------------------------------------------
@@ -862,7 +935,7 @@ async function verificarParametroFamiliaURL() {
     }
     // Si ya la tienes, se juntan las dos versiones sin preguntar
     if (getFamilias().some(f => f.codigo === datos.codigo)) return unirseConDatos(datos);
-    return mostrarInvitacion(datos, () => unirseConDatos(datos));
+    return mostrarInvitacion(datos, (nombre) => unirseConDatos(datos, nombre));
   }
 
   const yaLaTengo = getFamilias().find(f => f.codigo === codigo);
@@ -880,13 +953,14 @@ async function verificarParametroFamiliaURL() {
       : err.message, { tipo: 'error', duracion: 5000 });
     return false;
   }
-  return mostrarInvitacion(sala, () => entrarEnSala(sala));
+  return mostrarInvitacion(sala, (nombre) => entrarEnSala(sala, nombre));
 }
 
 // Hoja de "Te han invitado a…"; devuelve una promesa con true si se une
 function mostrarInvitacion(sala, alUnirse) {
   const miembros = sala.miembros || [];
-  const sinNombre = !getYo().nombre;
+  // Si ya habías estado en ella, se propone el nombre que tenías allí
+  const yaEstuve = miembros.find(m => m.id === getYo().id);
   const nombresDentro = miembros.slice(0, 2).map(m => m.nombre);
   const textoMiembros = !miembros.length ? ''
     : miembros.length <= 2 ? `${nombresDentro.join(' y ')} ${miembros.length === 1 ? 'ya está' : 'ya están'} dentro.`
@@ -911,7 +985,11 @@ function mostrarInvitacion(sala, alUnirse) {
             <span>${plural((sala.comidas || []).length, 'receta')}</span>
             <span>${plural((sala.rapida || []).length + (sala.compra || []).length, 'producto')} en la compra</span>
           </div>
-          <form id="formInvitacion" novalidate>${sinNombre ? htmlCampoNombre(false) : ''}</form>
+          <form id="formInvitacion" novalidate>${htmlCampoNombre(false, {
+            etiqueta: `Cómo te verán en «${sala.nombre}»`,
+            valor: (yaEstuve && yaEstuve.nombre) || getYo().nombre,
+            ayuda: ayudaNombreFamilia()
+          })}</form>
         </div>
       `,
       pie: `
@@ -923,13 +1001,13 @@ function mostrarInvitacion(sala, alUnirse) {
 
     d.querySelector('form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (sinNombre) {
-        if (!e.target.minombre.value.trim()) return e.target.minombre.focus();
-        setMiNombre(e.target.minombre.value);
-      }
+      const nombre = e.target.minombre.value.trim();
+      if (!nombre) return e.target.minombre.focus();
+      // La primera vez, este nombre es también el general
+      if (!getYo().nombre) setMiNombre(nombre);
       unido = true;
       await Hoja.cerrar(d);
-      alUnirse();
+      alUnirse(nombre);
     });
   });
 }

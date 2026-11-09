@@ -6,7 +6,7 @@
    - API de sincronización: nunca se guarda en caché.
    ========================================================= */
 
-const CACHE = 'nutriplan-3.4.0';
+const CACHE = 'nutriplan-3.5.0';
 
 const ARCHIVOS = [
   './',
