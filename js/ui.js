@@ -138,6 +138,10 @@ const Hoja = (() => {
     d.addEventListener('close', () => {
       if (!d.dataset.cerrando) cerrar(d);
     });
+    // La hoja nunca se desplaza entera (navegadores sin overflow: clip); solo su cuerpo
+    d.addEventListener('scroll', () => {
+      if (d.scrollTop || d.scrollLeft) d.scrollTo(0, 0);
+    });
 
     document.body.appendChild(d);
     pila.push(d);

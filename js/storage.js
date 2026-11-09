@@ -25,7 +25,7 @@ const STORAGE_KEYS = {
   compraLegacy:     'nutriplan_compra'
 };
 
-const VERSION_APP = '3.2.0';
+const VERSION_APP = '3.2.1';
 
 // Colecciones de cada familia que se sincronizan
 const COLECCIONES = ['dietas', 'comidas', 'compra', 'rapida', 'historial', 'miembros'];

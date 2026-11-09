@@ -100,6 +100,7 @@ function abrirAjustes() {
       <section class="ajustes-bloque">
         <h3>La app</h3>
         <div class="lista">
+          ${htmlFilaInstalar()}
           <button class="fila" data-x="actualizar">${ico('repetir')}<span class="fila-texto"><span class="fila-titulo">Actualizar la app</span><span class="fila-detalle ajuste-detalle">Tienes la ${VERSION_APP}. Úsalo si en otro móvil algo se ve distinto</span></span></button>
         </div>
       </section>
@@ -129,6 +130,58 @@ function abrirAjustes() {
   en('cargarEjemplos', () => ACCIONES.cargarEjemplos());
   en('quitarEjemplos', () => ACCIONES.quitarEjemplos());
   en('actualizar', () => actualizarApp());
+  // El aviso de instalar necesita el toque del usuario: se pide antes de cerrar la hoja
+  d.querySelector('[data-x="instalar"]')?.addEventListener('click', () => {
+    instalarApp();
+    Hoja.cerrar(d);
+  });
+}
+
+/* -------------------------------------------------------
+   Instalar en el móvil: con su icono y sin la barra del
+   navegador. Chrome avisa (beforeinstallprompt) cuando se
+   puede; en iPhone solo se puede desde Safari a mano.
+------------------------------------------------------- */
+let peticionInstalar = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); // Se ofrece desde Ajustes, sin banners
+  peticionInstalar = e;
+});
+
+window.addEventListener('appinstalled', () => {
+  peticionInstalar = null;
+  aviso('NutriPlan ya está en tu pantalla de inicio');
+});
+
+function estaInstalada() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function htmlFilaInstalar() {
+  if (estaInstalada()) return '';
+  const fila = (detalle, accion) => `
+    <${accion ? 'button data-x="instalar"' : 'div'} class="fila">
+      ${ico('descargar')}
+      <span class="fila-texto">
+        <span class="fila-titulo">Instalar en el móvil</span>
+        <span class="fila-detalle ajuste-detalle">${detalle}</span>
+      </span>
+    </${accion ? 'button' : 'div'}>`;
+
+  if (peticionInstalar) return fila('Con su icono en la pantalla de inicio y sin la barra del navegador', true);
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return fila('En Safari, toca Compartir y luego «Añadir a pantalla de inicio»');
+  return fila('En el menú ⋮ del navegador, elige «Instalar aplicación» o «Añadir a pantalla de inicio» y después «Instalar»');
+}
+
+async function instalarApp() {
+  if (!peticionInstalar) return;
+  const peticion = peticionInstalar;
+  peticionInstalar = null; // Solo se puede usar una vez
+  try {
+    await peticion.prompt();
+    await peticion.userChoice;
+  } catch (e) { /* el usuario lo cerró */ }
 }
 
 function aplicarAjuste(nombre, activo) {

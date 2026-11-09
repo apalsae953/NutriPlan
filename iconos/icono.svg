@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#2d6a46"/>
-  <path d="M106 262h300a150 150 0 0 1-300 0Z" fill="#f4f1ea"/>
-  <rect x="206" y="420" width="100" height="18" rx="9" fill="#f4f1ea"/>
-  <path d="M262 248Q268 150 360 118Q352 214 262 248Z" fill="#a9d8b6"/>
-  <path d="M250 248Q236 190 170 170Q184 236 250 248Z" fill="#a9d8b6"/>
+  <rect width="512" height="512" rx="114" fill="#2d6a46"/>
+  <g transform="rotate(-16 210 230)">
+    <rect x="186" y="96" width="48" height="200" rx="24" fill="#d39a4f"/>
+    <path d="M200 128l20-12M200 160l20-12M200 192l20-12" stroke="#f0cf96" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g fill="#a9d8b6">
+    <path d="M0 0C-26-34-26-84 0-116C26-84 26-34 0 0Z" transform="translate(300 236) rotate(8)" fill="#8ccaa0"/>
+    <path d="M0 0C-22-30-22-70 0-96C22-70 22-30 0 0Z" transform="translate(316 240) rotate(42)"/>
+  </g>
+  <path d="M160 228L168 214L176 228L184 214L192 228L200 214L208 228L216 214L224 228L232 214L240 228L248 214L256 228L264 214L272 228L280 214L288 228L296 214L304 228L312 214L320 228L328 214L336 228L344 214L352 228L352 400Q352 424 328 424L184 424Q160 424 160 400Z" fill="#f4f1ea"/>
+  <path d="M160 228H352V254H160Z" fill="#e2dacb"/>
+  <path d="M213 336L243 366L300 306" fill="none" stroke="#2d6a46" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

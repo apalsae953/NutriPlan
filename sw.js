@@ -6,7 +6,7 @@
    - API de sincronización: nunca se guarda en caché.
    ========================================================= */
 
-const CACHE = 'nutriplan-3.2.0';
+const CACHE = 'nutriplan-3.2.1';
 
 const ARCHIVOS = [
   './',
@@ -28,8 +28,12 @@ const ARCHIVOS = [
   'js/ajustes.js',
   'js/app.js',
   'iconos/icono.svg',
+  'iconos/icono-32.png',
+  'iconos/icono-180.png',
   'iconos/icono-192.png',
-  'iconos/icono-512.png'
+  'iconos/icono-512.png',
+  'iconos/icono-maskable-192.png',
+  'iconos/icono-maskable-512.png'
 ];
 
 self.addEventListener('install', (e) => {

@@ -695,6 +695,8 @@ dialog.hoja {
   background: rgba(24, 18, 8, 0);
   color: var(--tinta);
   overflow: hidden;
+  /* clip, y no solo hidden: así el navegador no puede desplazar la hoja al enfocar algo */
+  overflow: clip;
   transition: background-color .28s var(--ease-out);
 }
 

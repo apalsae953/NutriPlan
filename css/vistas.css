@@ -971,6 +971,7 @@
 
 /* Previsualización de ingredientes para añadir a la compra */
 .previa-fila {
+  position: relative; /* La casilla oculta tiene que quedarse dentro de su fila */
   cursor: pointer;
 }
 
