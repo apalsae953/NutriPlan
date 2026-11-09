@@ -632,6 +632,54 @@ button.fila:active,
 }
 
 /* ---------------------------------------------------------
+   Interruptor sí / no
+--------------------------------------------------------- */
+.interruptor {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 28px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--superficie-3);
+  cursor: pointer;
+  transition: background-color .2s var(--ease-out);
+}
+
+.interruptor::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(30, 20, 5, .22), 0 1px 1px rgba(30, 20, 5, .08);
+  transition: transform .22s var(--ease-out);
+}
+
+.interruptor:checked {
+  background: var(--acento);
+}
+
+.interruptor:checked::before {
+  transform: translateX(18px);
+}
+
+.interruptor:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.interruptor:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------
    Hojas (dialog) — bottom sheet en móvil
 --------------------------------------------------------- */
 dialog.hoja {

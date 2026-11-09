@@ -17,6 +17,20 @@ let tRenderRapida = null;
 function configurarCompra() {
   const form = document.getElementById('formRapida');
   const entrada = document.getElementById('entradaRapida');
+  const nota = document.getElementById('notaRapida');
+  const botonNota = document.getElementById('botonNotaRapida');
+
+  // Las instrucciones son opcionales: el campo solo aparece si se pide
+  const mostrarNota = (visible) => {
+    nota.hidden = !visible;
+    botonNota.setAttribute('aria-expanded', visible);
+    if (!visible) nota.value = '';
+  };
+  botonNota.addEventListener('click', () => {
+    const abrir = nota.hidden;
+    mostrarNota(abrir);
+    (abrir ? nota : entrada).focus();
+  });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -24,8 +38,9 @@ function configurarCompra() {
       entrada.focus();
       return;
     }
-    anadirARapida(entrada.value);
+    anadirARapida(entrada.value, nota.value);
     entrada.value = '';
+    mostrarNota(false);
     entrada.focus();
   });
 
@@ -109,13 +124,18 @@ function renderizarListaRapida() {
   if (!lista.length) {
     cont.innerHTML = `
       <div class="vacio-compacto">
-        <p><strong>La lista está vacía.</strong> Escribe arriba lo que haga falta y pulsa intro. Puedes poner varias cosas a la vez separadas por comas.</p>
+        <p><strong>La lista está vacía.</strong> Escribe arriba lo que haga falta y pulsa intro. Puedes poner varias cosas a la vez separadas por comas, y la cantidad delante: «pan, 2 kg naranjas». Con ${ico('nota')} le añades instrucciones.</p>
         ${getCompra().some(i => !i.comprado) ? `
           <button class="boton boton-secundario boton-pequeno" data-accion="traerDeFija">${ico('fija')}Traer lo pendiente de la fija</button>` : ''}
       </div>
     `;
     return;
   }
+
+  // Ajustes: agrupar por secciones del súper y mandar lo marcado al final
+  const agrupar = getPref('agruparRapida', true);
+  const alFinal = getPref('marcadosAlFinal', true);
+  const principales = alFinal ? pendientes : lista;
 
   cont.innerHTML = `
     ${!pendientes.length ? `
@@ -127,14 +147,18 @@ function renderizarListaRapida() {
       </div>
     ` : htmlProgreso(comprados.length, lista.length, `${comprados.length} de ${lista.length} en el carro`)}
 
-    ${agruparPorCategoria(pendientes).map(([cat, items]) => `
+    ${!principales.length ? '' : agrupar ? agruparPorCategoria(principales).map(([cat, items]) => `
       <section class="grupo">
         ${htmlCabeceraGrupo(cat, items.length)}
         <div class="lista">${items.map(htmlFilaRapida).join('')}</div>
       </section>
-    `).join('')}
+    `).join('') : `
+      <section class="grupo">
+        <div class="lista">${principales.map(htmlFilaRapida).join('')}</div>
+      </section>
+    `}
 
-    ${comprados.length ? `
+    ${alFinal && comprados.length ? `
       <section class="grupo carro">
         <div class="grupo-cabecera">
           <span>En el carro</span>
@@ -144,6 +168,9 @@ function renderizarListaRapida() {
         <div class="lista">${comprados.map(htmlFilaRapida).join('')}</div>
       </section>
     ` : ''}
+
+    ${getPref('pistaEditarRapida', false) ? '' : `
+      <p class="pista-lista">Mantén pulsado un producto para cambiarlo o añadirle instrucciones.</p>`}
   `;
   recienAnadidos = new Set();
 }
@@ -158,6 +185,12 @@ function detalleProducto(i) {
   return partes.length ? `<span class="producto-cantidad">${partes.join(' · ')}</span>` : '';
 }
 
+// Instrucciones o notas: solo se pintan si hay algo escrito
+function htmlNotaProducto(i) {
+  const texto = String(i.notas || '').trim();
+  return texto ? `<span class="producto-nota">${ico('nota')}${esc(texto)}</span>` : '';
+}
+
 function htmlFilaRapida(i) {
   return `
     <div class="producto ${i.comprado ? 'marcado' : ''} ${recienAnadidos.has(i.id) ? 'producto-entrando' : ''}" data-pulsacion-larga="editarRapida" data-id="${esc(i.id)}">
@@ -166,6 +199,7 @@ function htmlFilaRapida(i) {
         <span class="producto-texto">
           <span class="producto-nombre">${esc(i.nombre)}</span>
           ${detalleProducto(i)}
+          ${htmlNotaProducto(i)}
         </span>
       </button>
       <button class="boton-icono pequeno" data-accion="quitarRapida" data-id="${esc(i.id)}" aria-label="Quitar ${esc(i.nombre)}">${ico('cerrar')}</button>
@@ -199,8 +233,10 @@ function renderizarSugerencias(pendientes) {
    Añadir a la lista rápida
    Acepta "pan, leche, 2 kg naranjas" de una vez
 ------------------------------------------------------- */
-function anadirARapida(texto) {
-  const entradas = dividirEntradas(texto).map(interpretarEntrada).filter(Boolean);
+function anadirARapida(texto, notas = '') {
+  const nota = String(notas || '').trim();
+  const entradas = dividirEntradas(texto).map(interpretarEntrada).filter(Boolean)
+    .map(e => (nota ? { ...e, notas: nota } : e));
   if (!entradas.length) return;
 
   const r = anadirProductosARapida(entradas);
@@ -213,7 +249,7 @@ function anadirARapida(texto) {
 }
 
 /*
-  Añade productos [{ nombre, cantidad, categoria }] a la rápida.
+  Añade productos [{ nombre, cantidad, categoria, notas }] a la rápida.
   Si ya estaban, vuelven a quedar pendientes en vez de duplicarse.
 */
 function anadirProductosARapida(productos) {
@@ -228,8 +264,9 @@ function anadirProductosARapida(productos) {
     const idx = lista.findIndex(i => claveProducto(i.nombre) === clave);
     if (idx >= 0) {
       const ex = lista[idx];
-      if (!ex.comprado && (!p.cantidad || p.cantidad === ex.cantidad)) repetidos++;
+      if (!ex.comprado && (!p.cantidad || p.cantidad === ex.cantidad) && (!p.notas || p.notas === ex.notas)) repetidos++;
       lista[idx] = { ...ex, comprado: false, marcadoPor: '', cantidad: p.cantidad || ex.cantidad || '' };
+      if (p.notas) lista[idx].notas = p.notas;
       anotados.push(lista[idx]);
       return;
     }
@@ -242,6 +279,7 @@ function anadirProductosARapida(productos) {
       autor: getYo().id,
       creadoEn: Date.now()
     };
+    if (p.notas) item.notas = p.notas;
     lista.push(item);
     anotados.push(item);
     recienAnadidos.add(item.id);
@@ -312,6 +350,7 @@ function quitarVarios(coleccion, filtro, mensaje) {
 function abrirEditarRapida(id) {
   const item = getRapida().find(i => i.id === id);
   if (!item) return;
+  setPref('pistaEditarRapida', true);
 
   Hoja.abrir({
     titulo: 'Editar producto',
@@ -327,6 +366,11 @@ function abrirEditarRapida(id) {
             <input class="entrada" name="cantidad" value="${esc(item.cantidad || '')}" placeholder="Opcional" />
           </label>
         </div>
+        <label class="campo">
+          <span class="campo-etiqueta">Instrucciones</span>
+          <textarea class="entrada" name="notas" rows="2" maxlength="200" placeholder="Opcional. Ej.: la de marca blanca, sin lactosa, que esté madura…">${esc(item.notas || '')}</textarea>
+          <span class="campo-ayuda">Solo se ve en la lista si escribes algo.</span>
+        </label>
         <label class="campo">
           <span class="campo-etiqueta">Sección del súper</span>
           ${htmlSelectorCategoria(item.categoria)}
@@ -345,7 +389,7 @@ function abrirEditarRapida(id) {
       d.querySelector('[data-x="aFija"]').addEventListener('click', async () => {
         await Hoja.cerrar(d);
         const v = valoresFormulario(form);
-        anadirAFija([{ nombre: v.nombre || item.nombre, cantidad: v.cantidad, categoria: v.categoria }]);
+        anadirAFija([{ nombre: v.nombre || item.nombre, cantidad: v.cantidad, categoria: v.categoria, notas: v.notas }]);
         aviso('Guardado en la lista fija');
       });
 
@@ -353,7 +397,8 @@ function abrirEditarRapida(id) {
         e.preventDefault();
         const v = valoresFormulario(form);
         if (!v.nombre) return form.nombre.focus();
-        const editado = { ...item, nombre: capitalizar(v.nombre), cantidad: v.cantidad, categoria: v.categoria };
+        const editado = { ...item, nombre: capitalizar(v.nombre), cantidad: v.cantidad, categoria: v.categoria, notas: v.notas };
+        if (!editado.notas) delete editado.notas;
         const lista = getRapida().map(i => (i.id === id ? editado : i));
         // Recordar la sección elegida para la próxima vez
         actualizarFamiliaActiva({ rapida: lista, historial: anotarEnHistorial([editado]) });
@@ -405,6 +450,7 @@ function renderizarListaFija() {
   }
 
   cont.innerHTML = `
+    ${consultaFija ? '' : htmlAvisoEjemplos('compra')}
     ${marcados ? `
       <div class="progreso">
         <span>${marcados} de ${todos.length} marcados</span>
@@ -431,9 +477,9 @@ function htmlFilaFija(i) {
       <button class="producto-marcar" data-accion="marcarFija" data-id="${esc(i.id)}" aria-pressed="${!!i.comprado}">
         <span class="casilla">${ico('check')}</span>
         <span class="producto-texto">
-          <span class="producto-nombre">${esc(i.nombre)}</span>
+          <span class="producto-nombre">${esc(i.nombre)}${esEjemplo('compra', i) ? '<span class="etiqueta-ejemplo">Ejemplo</span>' : ''}</span>
           ${detalleProducto(i)}
-          ${i.notas ? `<span class="producto-nota">${ico('nota')}${esc(i.notas)}</span>` : ''}
+          ${htmlNotaProducto(i)}
         </span>
       </button>
       <button class="boton-icono pequeno" data-accion="editarFija" data-id="${esc(i.id)}" aria-label="Editar ${esc(i.nombre)}">${ico('editar')}</button>
@@ -672,7 +718,10 @@ function textoLista(items, titulo) {
   const lineas = [titulo];
   agruparPorCategoria(items).forEach(([cat, lista]) => {
     lineas.push('', infoCategoria(cat).nombre);
-    lista.forEach(i => lineas.push(`• ${i.nombre}${i.cantidad ? ` (${i.cantidad})` : ''}`));
+    lista.forEach(i => {
+      const nota = String(i.notas || '').trim();
+      lineas.push(`• ${i.nombre}${i.cantidad ? ` (${i.cantidad})` : ''}${nota ? ` — ${nota}` : ''}`);
+    });
   });
   return lineas.join('\n');
 }

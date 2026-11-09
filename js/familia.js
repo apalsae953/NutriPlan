@@ -61,14 +61,17 @@ function actualizarChipFamilia() {
     </button>
   `;
 
-  // Caras de la familia a la derecha (si hay más gente aparte de ti)
+  // Caras de la familia a la derecha (si hay más gente aparte de ti) y los ajustes
   const miembros = f.miembros || [];
   const derecha = document.getElementById('barraDerecha');
-  derecha.innerHTML = miembros.length > 1 ? `
-    <button class="pila-avatares" data-accion="abrirFamilia" aria-label="${plural(miembros.length, 'miembro')} en la familia">
-      ${miembros.slice(0, 3).map(m => htmlAvatarMiembro(m)).join('')}
-      ${miembros.length > 3 ? `<span class="avatar avatar-mas">+${miembros.length - 3}</span>` : ''}
-    </button>` : '';
+  derecha.innerHTML = `
+    ${miembros.length > 1 ? `
+      <button class="pila-avatares" data-accion="abrirFamilia" aria-label="${plural(miembros.length, 'miembro')} en la familia">
+        ${miembros.slice(0, 3).map(m => htmlAvatarMiembro(m)).join('')}
+        ${miembros.length > 3 ? `<span class="avatar avatar-mas">+${miembros.length - 3}</span>` : ''}
+      </button>` : ''}
+    <button class="boton-icono" data-accion="abrirAjustes" aria-label="Ajustes" title="Ajustes">${ico('ajustes')}</button>
+  `;
 }
 
 /* -------------------------------------------------------
@@ -80,7 +83,6 @@ function abrirFamilia() {
   const yo = getYo();
   const miembros = (activa.miembros || []).slice()
     .sort((a, b) => (a.id === yo.id ? -1 : b.id === yo.id ? 1 : (a.unidoEn || 0) - (b.unidoEn || 0)));
-  const tema = getPref('tema', 'sistema');
   const otras = familias.filter(f => f.id !== activa.id);
 
   const d = Hoja.abrir({
@@ -135,29 +137,17 @@ function abrirFamilia() {
       </div>
 
       <section class="ajustes-bloque">
-        <h3>Apariencia</h3>
-        ${htmlSegmentado('tema', [
-          { valor: 'sistema', texto: 'Automático' },
-          { valor: 'claro', texto: 'Claro' },
-          { valor: 'oscuro', texto: 'Oscuro' }
-        ], tema)}
-      </section>
-
-      <section class="ajustes-bloque">
         <h3>Datos de «${esc(activa.nombre)}»</h3>
         <div class="lista">
           <button class="fila" data-x="exportar">${ico('descargar')}<span class="fila-texto"><span class="fila-titulo">Descargar copia de seguridad</span><span class="fila-detalle">Un archivo con todo lo de esta familia</span></span></button>
           <label class="fila tocable" style="cursor:pointer">${ico('subir')}<span class="fila-texto"><span class="fila-titulo">Importar una copia</span><span class="fila-detalle">Se crea como familia nueva, sin tocar esta</span></span>
             <input type="file" accept=".json,.nutriplan,application/json" hidden data-x="importar" />
           </label>
-          ${tieneEjemplos()
-            ? `<button class="fila" data-x="quitarEjemplos">${ico('vaciar')}<span class="fila-texto"><span class="fila-titulo">Quitar los datos de ejemplo</span><span class="fila-detalle">Lo que hayáis creado se queda</span></span></button>`
-            : `<button class="fila" data-x="ejemplos">${ico('hoja')}<span class="fila-texto"><span class="fila-titulo">Cargar datos de ejemplo</span><span class="fila-detalle">Una semana de dieta, recetas y lista fija</span></span></button>`}
           ${otras.length ? `<button class="fila peligro" data-x="salir">${ico('salir')}<span class="fila-texto"><span class="fila-titulo">${activa.codigo ? 'Salir de esta familia' : 'Borrar esta familia'}</span><span class="fila-detalle">${activa.codigo ? 'Los demás la seguirán teniendo' : 'Se borra de este dispositivo'}</span></span></button>` : ''}
         </div>
       </section>
 
-      <p class="version-app">NutriPlan ${VERSION_APP}</p>
+      <button class="boton boton-texto boton-ajustes-app" data-x="ajustes">${ico('ajustes')}Ajustes de la app</button>
     `
   });
 
@@ -171,18 +161,13 @@ function abrirFamilia() {
   en('[data-x="nueva"]', () => abrirNuevaFamilia());
   en('[data-x="unirme"]', () => abrirUnirme());
   en('[data-x="exportar"]', () => descargarCopia(activa.id));
-  en('[data-x="ejemplos"]', () => ACCIONES.cargarEjemplos());
-  en('[data-x="quitarEjemplos"]', () => ACCIONES.quitarEjemplos());
+  en('[data-x="ajustes"]', () => abrirAjustes());
   en('[data-x="salir"]', () => salirDeFamilia(activa.id));
   en('[data-minombre]', () => abrirMiNombre());
   en('[data-miembro]', (el) => menuMiembro(el.dataset.miembro));
   en('[data-cambiar]', (el) => cambiarAFamilia(el.dataset.cambiar));
   en('[data-menu]', (el) => menuFamilia(el.dataset.menu));
 
-  d.querySelectorAll('input[name="tema"]').forEach(r => r.addEventListener('change', () => {
-    setPref('tema', r.value);
-    aplicarTema(r.value);
-  }));
   d.querySelector('[data-x="importar"]').addEventListener('change', async (e) => {
     const archivo = e.target.files[0];
     if (!archivo) return;
@@ -320,48 +305,99 @@ function enlaceInvitacion(codigo) {
   return `${location.origin}${location.pathname}?familia=${encodeURIComponent(codigo)}`;
 }
 
-async function abrirInvitar(id) {
-  let f = getFamiliaPorId(id);
-  if (!f) return;
+function textoInvitacion(f) {
+  const quien = getYo().nombre;
+  return `${quien ? `${quien} te invita` : 'Te invitan'} a «${f.nombre}» en NutriPlan para compartir la compra, las recetas y las dietas de la semana:\n${enlaceInvitacion(f.codigo)}\n\nO entra con el código ${f.codigo}`;
+}
 
-  // Una familia local se registra en el servidor la primera vez que se invita
-  if (!f.codigo) {
-    try {
-      f = await convertirEnCompartida(id);
-      refrescarApp();
-    } catch (e) {
-      aviso('No se ha podido conectar con el servidor. Inténtalo con conexión.', { tipo: 'error' });
-      return;
-    }
-  }
-  const enlace = enlaceInvitacion(f.codigo);
+/*
+  La hoja se abre al momento. Si la familia todavía es solo de
+  este dispositivo, se registra en el servidor ahí dentro; si no
+  se puede, se explica por qué y se deja reintentar sin perder nada.
+*/
+function abrirInvitar(id) {
+  const inicial = getFamiliaPorId(id);
+  if (!inicial) return;
 
   const d = Hoja.abrir({
     titulo: 'Invitar a la familia',
-    subtitulo: f.nombre,
-    cuerpo: `
+    subtitulo: inicial.nombre,
+    cuerpo: '<div data-x="contenido"></div>',
+    alCerrar: () => window.removeEventListener('online', reintentarAlVolver)
+  });
+  const cont = d.querySelector('[data-x="contenido"]');
+  let intentando = false;
+
+  const pintarCodigo = (f) => {
+    cont.innerHTML = `
       <p class="campo-ayuda" style="font-size:14.5px">Quien abra el enlace o escriba el código entrará en «${esc(f.nombre)}»: veréis la misma compra, las recetas y las dietas, y los cambios de cada uno al momento. No hace falta cuenta.</p>
       <span class="codigo-grande" aria-label="Código ${esc(f.codigo.split('').join(' '))}">${esc(f.codigo)}</span>
       <div class="grupo-botones">
         <button class="boton boton-primario" style="flex:1" data-x="enlace">${ico('compartir')}Enviar invitación</button>
         <button class="boton boton-secundario" style="flex:1" data-x="codigo">${ico('copiar')}Copiar código</button>
       </div>
-    `
-  });
+    `;
+    cont.querySelector('[data-x="enlace"]').addEventListener('click', () => {
+      compartirTexto(`NutriPlan · ${f.nombre}`, textoInvitacion(f));
+    });
+    cont.querySelector('[data-x="codigo"]').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(f.codigo);
+        aviso(`Código ${f.codigo} copiado`);
+      } catch (e) {
+        aviso(`El código es ${f.codigo}`);
+      }
+    });
+  };
 
-  d.querySelector('[data-x="enlace"]').addEventListener('click', () => {
-    const quien = getYo().nombre;
-    compartirTexto(`NutriPlan · ${f.nombre}`,
-      `${quien ? `${quien} te invita` : 'Te invitan'} a «${f.nombre}» en NutriPlan para compartir la compra, las recetas y las dietas de la semana:\n${enlace}\n\nO entra con el código ${f.codigo}`);
-  });
-  d.querySelector('[data-x="codigo"]').addEventListener('click', async () => {
+  const pintarProblema = (err) => {
+    const motivo = err && err.motivo;
+    const queHacer = motivo === 'sin-conexion'
+      ? 'En cuanto vuelvas a tener conexión se preparará solo.'
+      : motivo === 'sin-servidor'
+        ? 'Ábrela desde la dirección donde está instalada (la que arranca el servidor) y podrás invitar.'
+        : 'Prueba otra vez en un momento.';
+    cont.innerHTML = `
+      <div class="estado-invitar">
+        ${ico(motivo === 'sin-conexion' ? 'sin_conexion' : 'nube')}
+        <p class="estado-invitar-titulo">Todavía no se puede crear el código</p>
+        <p>${esc(textoErrorServidor(motivo))} ${esc(queHacer)}</p>
+        <p class="campo-ayuda">Lo de «${esc(inicial.nombre)}» sigue guardado en este móvil. No se pierde nada.</p>
+      </div>
+      <div class="grupo-botones">
+        <button class="boton boton-secundario" style="flex:1" data-cerrar-hoja>Cerrar</button>
+        <button class="boton boton-primario" style="flex:1" data-x="reintentar">${ico('repetir')}Reintentar</button>
+      </div>
+    `;
+    cont.querySelector('[data-x="reintentar"]').addEventListener('click', preparar);
+  };
+
+  // Una familia local se registra en el servidor la primera vez que se invita
+  async function preparar() {
+    if (intentando || !d.isConnected) return;
+    const f = getFamiliaPorId(id);
+    if (!f) return Hoja.cerrar(d);
+    if (f.codigo) return pintarCodigo(f);
+
+    intentando = true;
+    cont.innerHTML = '<p class="estado-invitar-cargando">Preparando la invitación…</p>';
     try {
-      await navigator.clipboard.writeText(f.codigo);
-      aviso(`Código ${f.codigo} copiado`);
-    } catch (e) {
-      aviso(`El código es ${f.codigo}`);
+      const compartida = await convertirEnCompartida(id);
+      refrescarApp();
+      if (d.isConnected) pintarCodigo(compartida);
+    } catch (err) {
+      if (d.isConnected) pintarProblema(err);
+    } finally {
+      intentando = false;
     }
-  });
+  }
+
+  function reintentarAlVolver() {
+    if (!getFamiliaPorId(id)?.codigo) preparar();
+  }
+  window.addEventListener('online', reintentarAlVolver);
+
+  preparar();
 }
 
 /* -------------------------------------------------------
@@ -410,7 +446,7 @@ function abrirNuevaFamilia() {
         refrescarApp();
 
         if (familia.codigo) abrirInvitar(familia.id);
-        else if (sinServidor) aviso('Creada solo en este dispositivo: no hay conexión con el servidor. Podrás invitar después.');
+        else if (sinServidor) aviso(`«${familia.nombre}» creada en este móvil. Podrás invitar cuando haya conexión con el servidor.`, { duracion: 4500 });
         else aviso(`Familia «${familia.nombre}» creada`);
       });
     }
@@ -670,7 +706,7 @@ function abrirBienvenida() {
       } catch (err) {
         await Hoja.cerrar(d, { forzar: true });
         refrescarApp();
-        aviso('Familia creada solo en este dispositivo: no hay conexión. Podrás invitar después.');
+        aviso(`«${nombre}» creada en este móvil. Podrás invitar cuando haya conexión con el servidor.`, { duracion: 4500 });
       }
     }
 
@@ -837,7 +873,6 @@ registrarAcciones({
   abrirFamilia: () => abrirFamilia(),
   invitarActiva: () => {
     const f = getFamiliaActiva();
-    compartirTexto(`NutriPlan · ${f.nombre}`,
-      `${getYo().nombre || 'Te invitan'}${getYo().nombre ? ' te invita' : ''} a «${f.nombre}» en NutriPlan para compartir la compra, las recetas y las dietas de la semana:\n${enlaceInvitacion(f.codigo)}\n\nO entra con el código ${f.codigo}`);
+    compartirTexto(`NutriPlan · ${f.nombre}`, textoInvitacion(f));
   }
 });

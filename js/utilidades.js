@@ -128,9 +128,10 @@ function debounce(fn, ms = 200) {
   };
 }
 
-// Pequeña vibración de confirmación (solo Android la soporta)
+// Pequeña vibración de confirmación (solo Android la soporta). Se puede apagar en Ajustes.
 function vibrar(ms = 8) {
   try {
+    if (typeof getPref === 'function' && !getPref('vibracion', true)) return;
     if (navigator.vibrate) navigator.vibrate(ms);
   } catch (e) { /* sin soporte */ }
 }

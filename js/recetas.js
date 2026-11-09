@@ -113,7 +113,10 @@ function renderizarListaRecetas() {
     return;
   }
 
-  cont.innerHTML = `<div class="lista-recetas">${recetas.map(htmlTarjetaReceta).join('')}</div>`;
+  cont.innerHTML = `
+    ${htmlAvisoEjemplos('comidas')}
+    <div class="lista-recetas">${recetas.map(htmlTarjetaReceta).join('')}</div>
+  `;
 }
 
 function htmlTarjetaReceta(r) {
@@ -126,7 +129,7 @@ function htmlTarjetaReceta(r) {
         <span class="toma toma-${esc(r.toma)}">${esc(r.toma || 'Sin momento')}</span>
         ${numero(r.kcal) ? `<span class="receta-kcal">${fmt(r.kcal)} <small>kcal</small></span>` : ''}
       </div>
-      <h3 class="receta-nombre">${esc(r.nombre)}</h3>
+      <h3 class="receta-nombre">${esc(r.nombre)}${esEjemplo('comidas', r) ? '<span class="etiqueta-ejemplo">Ejemplo</span>' : ''}</h3>
       ${ings.length ? `<p class="receta-ings">${esc(ings.join(', '))}</p>` : ''}
       ${macros.length || autor ? `
         <div class="receta-macros">
@@ -148,7 +151,7 @@ function abrirDetalleReceta(id) {
 
   Hoja.abrir({
     titulo: r.nombre,
-    subtitulo: [r.toma, autor && `Receta de ${autor}`].filter(Boolean).join(' · '),
+    subtitulo: [r.toma, esEjemplo('comidas', r) ? 'Receta de ejemplo' : autor && `Receta de ${autor}`].filter(Boolean).join(' · '),
     cuerpo: `
       ${htmlCifras(r)}
       ${ings.length ? `

@@ -367,6 +367,42 @@ function mostrarToast(mensaje, tipo = 'info') {
 }
 
 /* -------------------------------------------------------
+   Aviso de datos de ejemplo dentro de cada apartado.
+   El botón quita solo los ejemplos de ese apartado.
+------------------------------------------------------- */
+function htmlAvisoEjemplos(col) {
+  const n = ejemplosEn(col).length;
+  if (!n) return '';
+  const textos = {
+    dietas:  [n === 1 ? 'Esta dieta es un ejemplo para que veas cómo funciona.' : `Hay ${n} dietas de ejemplo.`, n === 1 ? 'Quitarla' : 'Quitarlas'],
+    comidas: [n === 1 ? 'Hay una receta de ejemplo.' : `Hay ${n} recetas de ejemplo.`, n === 1 ? 'Quitarla' : 'Quitarlas'],
+    compra:  [n === 1 ? 'Hay un producto de ejemplo en la fija.' : `Hay ${n} productos de ejemplo en la fija.`, n === 1 ? 'Quitarlo' : 'Quitarlos']
+  };
+  const [texto, boton] = textos[col];
+  return `
+    <div class="nota-linea nota-ejemplos">
+      ${ico('info')}<span>${esc(texto)}</span>
+      <button class="boton-texto" data-accion="quitarEjemplos" data-col="${esc(col)}">${esc(boton)}</button>
+    </div>
+  `;
+}
+
+/* -------------------------------------------------------
+   Interruptor (sí / no) para los ajustes
+------------------------------------------------------- */
+function htmlInterruptor({ nombre, titulo, detalle = '', activo = false, desactivado = false }) {
+  return `
+    <label class="fila ajuste-fila ${desactivado ? 'desactivado' : ''}">
+      <span class="fila-texto">
+        <span class="fila-titulo">${esc(titulo)}</span>
+        ${detalle ? `<span class="fila-detalle ajuste-detalle">${esc(detalle)}</span>` : ''}
+      </span>
+      <input type="checkbox" class="interruptor" name="${esc(nombre)}" role="switch" ${activo ? 'checked' : ''} ${desactivado ? 'disabled' : ''} />
+    </label>
+  `;
+}
+
+/* -------------------------------------------------------
    Formularios: leer valores con nombre
 ------------------------------------------------------- */
 function valoresFormulario(form) {

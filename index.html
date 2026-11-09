@@ -25,12 +25,13 @@
   <link rel="stylesheet" href="css/componentes.css" />
   <link rel="stylesheet" href="css/vistas.css" />
 
-  <!-- Aplicar el tema guardado antes de pintar para evitar parpadeos -->
+  <!-- Aplicar el tema y el tamaño de letra guardados antes de pintar para evitar parpadeos -->
   <script>
     (function () {
       try {
-        var tema = (JSON.parse(localStorage.getItem('nutriplan_prefs')) || {}).tema;
-        if (tema === 'claro' || tema === 'oscuro') document.documentElement.dataset.tema = tema;
+        var prefs = JSON.parse(localStorage.getItem('nutriplan_prefs')) || {};
+        if (prefs.tema === 'claro' || prefs.tema === 'oscuro') document.documentElement.dataset.tema = prefs.tema;
+        if (prefs.letraGrande) document.documentElement.setAttribute('data-letra-grande', '');
       } catch (e) {}
     })();
   </script>
@@ -132,12 +133,20 @@
       <!-- Lista rápida -->
       <div id="panelRapida" role="tabpanel" aria-labelledby="pestanaRapida">
         <form class="anadir-rapido" id="formRapida" autocomplete="off">
-          <label class="solo-lectores" for="entradaRapida">Añadir a la lista rápida</label>
-          <input type="text" id="entradaRapida" name="entrada" placeholder="Añadir… (leche, 2 kg naranjas)"
-                 enterkeyhint="done" autocapitalize="sentences" list="productosConocidos" />
-          <button type="submit" class="boton-icono boton-primario" aria-label="Añadir">
-            <i data-ico="mas"></i>
-          </button>
+          <div class="anadir-rapido-fila">
+            <label class="solo-lectores" for="entradaRapida">Añadir a la lista rápida</label>
+            <input type="text" id="entradaRapida" name="entrada" placeholder="Añadir: pan, leche…"
+                   enterkeyhint="done" autocapitalize="sentences" list="productosConocidos" />
+            <button type="button" class="boton-icono anadir-nota" id="botonNotaRapida" aria-expanded="false" aria-controls="notaRapida" aria-label="Añadir instrucciones" title="Añadir instrucciones">
+              <i data-ico="nota"></i>
+            </button>
+            <button type="submit" class="boton-icono boton-primario" aria-label="Añadir">
+              <i data-ico="mas"></i>
+            </button>
+          </div>
+          <label class="solo-lectores" for="notaRapida">Instrucciones para quien compre (opcional)</label>
+          <input type="text" id="notaRapida" name="nota" class="anadir-rapido-nota" hidden maxlength="200"
+                 placeholder="Instrucciones (opcional): marca, tamaño, que esté madura…" enterkeyhint="done" autocapitalize="sentences" />
         </form>
         <datalist id="productosConocidos"></datalist>
         <div class="scroll-x sugerencias" id="sugerenciasRapida"></div>
@@ -179,6 +188,7 @@
   <script src="js/recetas.js"></script>
   <script src="js/compra.js"></script>
   <script src="js/familia.js"></script>
+  <script src="js/ajustes.js"></script>
   <script src="js/app.js"></script>
 
 </body>

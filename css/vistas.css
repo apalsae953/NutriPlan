@@ -634,13 +634,34 @@
    ========================================================= */
 .anadir-rapido {
   position: sticky;
-  top: calc(var(--barra-alto) + var(--seguro-arriba));
+  /* Con la letra grande el contenido va ampliado: se compensa para que no quede hueco bajo la barra */
+  top: calc((var(--barra-alto) + var(--seguro-arriba)) / var(--zoom, 1));
   z-index: 5;
-  display: flex;
-  gap: 8px;
   padding: 6px 0 10px;
   margin-top: -6px;
   background: linear-gradient(var(--fondo) 80%, transparent);
+}
+
+.anadir-rapido-fila {
+  display: flex;
+  gap: 8px;
+}
+
+.anadir-rapido input.anadir-rapido-nota {
+  display: block;
+  width: 100%;
+  height: 46px;
+  margin-top: 8px;
+  animation: aparecerNota .2s var(--ease-out);
+}
+
+.anadir-rapido input.anadir-rapido-nota[hidden] {
+  display: none;
+}
+
+@keyframes aparecerNota {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .anadir-rapido input {
@@ -681,6 +702,60 @@
 .anadir-rapido .boton-icono .ico {
   width: 24px;
   height: 24px;
+}
+
+/* Botón para escribir instrucciones: discreto hasta que se usa */
+.anadir-rapido .anadir-nota {
+  background: var(--superficie);
+  color: var(--tinta-3);
+  box-shadow: var(--sombra-1), inset 0 0 0 1px var(--linea);
+}
+
+.anadir-rapido .anadir-nota .ico {
+  width: 22px;
+  height: 22px;
+}
+
+.anadir-rapido .anadir-nota[aria-expanded="true"] {
+  background: var(--acento-suave);
+  color: var(--acento);
+  box-shadow: inset 0 0 0 1.5px var(--acento);
+}
+
+.vacio-compacto p .ico {
+  display: inline;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+}
+
+.pista-lista {
+  margin: 16px 8px 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tinta-3);
+}
+
+/* Marca pequeña para lo que es de ejemplo */
+.etiqueta-ejemplo {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--tinta-3);
+  font-family: var(--fuente);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 19px;
+  letter-spacing: .01em;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+
+.receta-nombre .etiqueta-ejemplo {
+  vertical-align: 3px;
 }
 
 .sugerencias {
@@ -1227,6 +1302,98 @@
   text-align: center;
   font-size: 12.5px;
   color: var(--tinta-3);
+}
+
+.boton-ajustes-app {
+  display: flex;
+  margin: 22px auto 0;
+  color: var(--tinta-2);
+}
+
+/* ---------------------------------------------------------
+   Ajustes
+--------------------------------------------------------- */
+.ajuste-fila {
+  gap: 14px;
+  cursor: pointer;
+}
+
+.ajuste-detalle {
+  white-space: normal;
+  margin-top: 1px;
+}
+
+.ajuste-fila.desactivado {
+  cursor: default;
+}
+
+.ajuste-fila.desactivado .fila-titulo {
+  color: var(--tinta-3);
+}
+
+.avatar-vacio {
+  background: var(--superficie-2);
+  color: var(--tinta-3);
+}
+
+.avatar-vacio .ico {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---------------------------------------------------------
+   Invitar cuando todavía no se puede crear el código
+--------------------------------------------------------- */
+.estado-invitar {
+  text-align: center;
+  padding: 6px 6px 18px;
+}
+
+.estado-invitar > .ico {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 12px;
+  color: var(--tinta-3);
+}
+
+.estado-invitar p {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--tinta-2);
+}
+
+.estado-invitar .estado-invitar-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--tinta);
+  margin-bottom: 8px;
+}
+
+.estado-invitar .campo-ayuda {
+  margin-top: 12px;
+  font-size: 13.5px;
+}
+
+.estado-invitar-cargando {
+  padding: 30px 0;
+  text-align: center;
+  color: var(--tinta-3);
+}
+
+/* ---------------------------------------------------------
+   Letra más grande (Ajustes): se amplía el contenido, no
+   la barra ni la navegación
+--------------------------------------------------------- */
+[data-letra-grande] {
+  --zoom: 1.12;
+}
+
+[data-letra-grande] .principal,
+[data-letra-grande] .hoja-cuerpo {
+  zoom: var(--zoom);
 }
 
 .invitacion {

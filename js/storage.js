@@ -25,7 +25,7 @@ const STORAGE_KEYS = {
   compraLegacy:     'nutriplan_compra'
 };
 
-const VERSION_APP = '3.1.0';
+const VERSION_APP = '3.2.0';
 
 // Colecciones de cada familia que se sincronizan
 const COLECCIONES = ['dietas', 'comidas', 'compra', 'rapida', 'historial', 'miembros'];
@@ -510,14 +510,56 @@ function soloYo() {
   return yo.nombre ? [{ id: yo.id, nombre: yo.nombre, unidoEn: Date.now() }] : [];
 }
 
+/* -------------------------------------------------------
+   Llamadas al servidor con errores que se puedan explicar:
+   - sin-conexion: el móvil no tiene internet
+   - sin-servidor: la app se ha abierto sin su servidor
+     (por ejemplo, abriendo index.html directamente)
+   - sin-respuesta: el servidor no contesta o falla
+------------------------------------------------------- */
+function errorServidor(motivo, mensaje) {
+  const e = new Error(mensaje || textoErrorServidor(motivo));
+  e.motivo = motivo;
+  return e;
+}
+
+function textoErrorServidor(motivo) {
+  if (motivo === 'sin-conexion') return 'Ahora mismo no tienes conexión a internet.';
+  if (motivo === 'sin-servidor') return 'Esta copia de NutriPlan está abierta sin su servidor, así que no puede compartir nada.';
+  return 'El servidor de NutriPlan no responde ahora mismo.';
+}
+
+async function llamarServidor(ruta, opciones = {}) {
+  if (!location.protocol.startsWith('http')) throw errorServidor('sin-servidor');
+  if (navigator.onLine === false) throw errorServidor('sin-conexion');
+
+  const control = new AbortController();
+  const limite = setTimeout(() => control.abort(), 12000);
+  let res;
+  try {
+    res = await fetch(ruta, { cache: 'no-store', ...opciones, signal: control.signal });
+  } catch (e) {
+    throw errorServidor(navigator.onLine === false ? 'sin-conexion' : 'sin-respuesta');
+  } finally {
+    clearTimeout(limite);
+  }
+
+  // Si no contesta con JSON, quien responde no es el servidor de NutriPlan
+  const esJson = (res.headers.get('content-type') || '').includes('application/json');
+  if (!esJson) throw errorServidor(res.status >= 500 && res.status !== 501 ? 'sin-respuesta' : 'sin-servidor');
+
+  const datos = await res.json().catch(() => ({}));
+  return { res, datos };
+}
+
 async function crearSalaEnServidor(datos) {
-  const res = await fetch('/api/sala/crear', {
+  const { res, datos: respuesta } = await llamarServidor('/api/sala/crear', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos)
   });
-  if (!res.ok) throw new Error('No se pudo crear la sala');
-  return res.json();
+  if (!res.ok) throw errorServidor('sin-respuesta');
+  return respuesta;
 }
 
 // Crea una familia nueva. Si compartida=true intenta registrarla en el servidor.
@@ -603,11 +645,10 @@ function renombrarFamiliaActiva(nombre, descripcion) {
 }
 
 async function obtenerSala(codigo) {
-  const res = await fetch(`/api/sala/${encodeURIComponent(codigo)}`, { cache: 'no-store' });
-  if (res.status === 404) throw new Error('No hay ninguna familia con ese código');
-  if (!res.ok) throw new Error('No se ha podido conectar. Comprueba la conexión.');
-  const data = await res.json();
-  return data.sala;
+  const { res, datos } = await llamarServidor(`/api/sala/${encodeURIComponent(codigo)}`);
+  if (res.status === 404) throw errorServidor('no-existe', 'No hay ninguna familia con ese código. Revisa que esté bien escrito.');
+  if (!res.ok || !datos.sala) throw errorServidor('sin-respuesta');
+  return datos.sala;
 }
 
 // Añade (o actualiza) la sala en la lista local y la activa
@@ -671,24 +712,46 @@ function leerCopiaSeguridad(json) {
 
 /* -------------------------------------------------------
    Datos de ejemplo: se añaden sin tocar lo tuyo y se
-   pueden quitar después sin perder nada propio
+   pueden quitar después sin perder nada propio.
+   Un ejemplo solo cuenta como tal mientras siga igual que
+   el original: si alguien lo edita, pasa a ser vuestro y ya
+   no se borra al quitar los ejemplos.
 ------------------------------------------------------- */
-const IDS_EJEMPLO = {
-  dietas: new Set(DATOS_INICIALES.dietas.map(x => x.id)),
-  comidas: new Set(DATOS_INICIALES.comidas.map(x => x.id)),
-  compra: new Set(DATOS_INICIALES.compra.map(x => x.id))
-};
+const COLECCIONES_EJEMPLO = ['dietas', 'comidas', 'compra'];
 
-function tieneEjemplos() {
-  const p = getFamiliaActiva();
-  if (!p) return false;
-  return Object.keys(IDS_EJEMPLO).some(col => (p[col] || []).some(x => IDS_EJEMPLO[col].has(x.id)));
+// Lo que cambia con el uso normal (marcar en el súper) no lo convierte en vuestro
+const CAMPOS_DE_USO = new Set(['comprado', 'marcadoPor', 'autor']);
+
+function firmaEjemplo(item) {
+  const limpio = {};
+  Object.keys(item || {}).forEach(k => {
+    const v = item[k];
+    const vacio = v === '' || v === null || v === undefined || (Array.isArray(v) && !v.length);
+    if (!vacio && !CAMPOS_DE_USO.has(k)) limpio[k] = v;
+  });
+  return serializarEstable(limpio);
+}
+
+const FIRMAS_EJEMPLO = Object.fromEntries(COLECCIONES_EJEMPLO.map(col =>
+  [col, new Map(DATOS_INICIALES[col].map(x => [x.id, firmaEjemplo(x)]))]));
+
+function esEjemplo(col, item) {
+  const firma = FIRMAS_EJEMPLO[col]?.get(item?.id);
+  return !!firma && firma === firmaEjemplo(item);
+}
+
+function ejemplosEn(col) {
+  return getColeccion(col).filter(x => esEjemplo(col, x));
+}
+
+function tieneEjemplos(col = null) {
+  return (col ? [col] : COLECCIONES_EJEMPLO).some(c => ejemplosEn(c).length > 0);
 }
 
 function cargarEjemplos() {
   const p = getFamiliaActiva();
   const cambios = {};
-  Object.keys(IDS_EJEMPLO).forEach(col => {
+  COLECCIONES_EJEMPLO.forEach(col => {
     const actuales = new Set((p[col] || []).map(x => x.id));
     const nuevos = clonar(DATOS_INICIALES[col]).filter(x => !actuales.has(x.id));
     cambios[col] = [...(p[col] || []), ...nuevos];
@@ -696,13 +759,40 @@ function cargarEjemplos() {
   actualizarFamiliaActiva(cambios);
 }
 
-function quitarEjemplos() {
+/*
+  Quita solo los ejemplos que siguen intactos de las colecciones
+  indicadas. Devuelve cuántos quitó y una función para deshacerlo.
+*/
+function quitarEjemplos(cols = COLECCIONES_EJEMPLO) {
   const p = getFamiliaActiva();
   const cambios = {};
-  Object.keys(IDS_EJEMPLO).forEach(col => {
-    cambios[col] = (p[col] || []).filter(x => !IDS_EJEMPLO[col].has(x.id));
+  const quitados = {};
+  let total = 0;
+
+  cols.forEach(col => {
+    const lista = p[col] || [];
+    quitados[col] = lista.map((item, idx) => ({ item, idx })).filter(({ item }) => esEjemplo(col, item));
+    if (!quitados[col].length) return;
+    total += quitados[col].length;
+    cambios[col] = lista.filter(x => !esEjemplo(col, x));
   });
-  actualizarFamiliaActiva(cambios);
+  if (total) actualizarFamiliaActiva(cambios);
+
+  const deshacer = () => {
+    const actual = getFamiliaActiva();
+    if (!actual || actual.id !== p.id) return;
+    const restaurado = {};
+    Object.entries(quitados).forEach(([col, entradas]) => {
+      if (!entradas.length) return;
+      const lista = (actual[col] || []).slice();
+      entradas.forEach(({ item, idx }) => {
+        if (!lista.some(x => x.id === item.id)) lista.splice(Math.min(idx, lista.length), 0, item);
+      });
+      restaurado[col] = lista;
+    });
+    actualizarFamiliaActiva(restaurado);
+  };
+  return { total, deshacer };
 }
 
 /* =========================================================

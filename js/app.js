@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   pintarIconosEstaticos();
   const primeraVez = inicializarStorage();
   aplicarTema(getPref('tema', 'sistema'));
+  aplicarLetra();
 
   configurarRecetas();
   configurarCompra();
@@ -30,8 +31,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     params.delete('vista');
     history.replaceState(null, '', `${location.pathname}${params.toString() ? `?${params}` : ''}`);
   }
+  // En Ajustes se puede elegir abrir siempre en el plan o en la compra
   const guardada = getPref('vista', 'plan') === 'platos' ? 'recetas' : getPref('vista', 'plan');
-  const inicial = VISTAS[pedida] ? pedida : guardada;
+  const preferida = getPref('inicio', 'ultima');
+  const inicial = VISTAS[pedida] ? pedida : VISTAS[preferida] ? preferida : guardada;
   irAVista(VISTAS[inicial] ? inicial : 'plan', { sinScroll: true });
 
   document.addEventListener('sync-estado', actualizarChipFamilia);
@@ -74,6 +77,7 @@ function irAVista(vista, { sinScroll = false } = {}) {
   document.title = `${VISTAS[vista].titulo} · NutriPlan`;
 
   refrescarApp();
+  actualizarPantallaEncendida();
   if (cambia && !sinScroll) window.scrollTo({ top: 0 });
 }
 

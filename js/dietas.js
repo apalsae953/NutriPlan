@@ -151,11 +151,7 @@ function renderizarPlan() {
   const esHoy = diaPlan === indiceHoy();
 
   cont.innerHTML = `
-    ${tieneEjemplos() ? `
-      <div class="nota-linea">
-        ${ico('info')}<span>Estás viendo datos de ejemplo.</span>
-        <button class="boton-texto" data-accion="quitarEjemplos">Quitarlos</button>
-      </div>` : ''}
+    ${esEjemplo('dietas', dieta) ? htmlAvisoEjemplos('dietas') : ''}
 
     <div class="scroll-x selector-dietas" role="list">
       ${dietas.map(d => `
@@ -900,13 +896,27 @@ registrarAcciones({
   },
   cargarEjemplos: () => {
     cargarEjemplos();
-    diaPlan = 0;
+    // El ejemplo va de lunes a viernes: el fin de semana se enseña el lunes
+    diaPlan = indiceHoy() < 5 ? indiceHoy() : 0;
     refrescarApp();
-    aviso('Ejemplo cargado: una semana de lunes a viernes');
+    aviso('Ejemplo cargado: una dieta de lunes a viernes, recetas y una lista fija');
   },
-  quitarEjemplos: () => {
-    quitarEjemplos();
+  // Con data-col quita solo los de ese apartado; sin él, todos
+  quitarEjemplos: (el) => {
+    const col = el && el.dataset ? el.dataset.col : '';
+    const { total, deshacer } = quitarEjemplos(col ? [col] : undefined);
     refrescarApp();
-    aviso('Datos de ejemplo quitados. Lo tuyo sigue igual.');
+    if (!total) {
+      aviso('No quedan datos de ejemplo. Lo que habéis cambiado ya cuenta como vuestro.');
+      return;
+    }
+    const mensajes = {
+      dietas: total === 1 ? 'Dieta de ejemplo quitada' : `${total} dietas de ejemplo quitadas`,
+      comidas: total === 1 ? 'Receta de ejemplo quitada' : `${total} recetas de ejemplo quitadas`,
+      compra: total === 1 ? 'Producto de ejemplo quitado' : `${total} productos de ejemplo quitados`
+    };
+    aviso(`${mensajes[col] || 'Datos de ejemplo quitados'}. Lo demás sigue igual.`, {
+      accion: { texto: 'Deshacer', fn: () => { deshacer(); refrescarApp(); } }
+    });
   }
 });
