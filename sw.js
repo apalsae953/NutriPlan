@@ -6,7 +6,7 @@
    - API de sincronización: nunca se guarda en caché.
    ========================================================= */
 
-const CACHE = 'nutriplan-3.2.1';
+const CACHE = 'nutriplan-3.4.0';
 
 const ARCHIVOS = [
   './',
@@ -20,6 +20,7 @@ const ARCHIVOS = [
   'js/ui.js',
   'js/categorias.js',
   'js/datos.js',
+  'js/nube.js',
   'js/storage.js',
   'js/dietas.js',
   'js/recetas.js',

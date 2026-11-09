@@ -31,6 +31,7 @@ function htmlAvatarMiembro(m, clase = '') {
 
 const TEXTOS_SYNC = {
   local: 'Solo en este dispositivo',
+  enlace: 'Se comparte por enlace',
   ok: 'Compartida y al día',
   guardando: 'Guardando cambios…',
   'sin-conexion': 'Sin conexión: se subirá al volver',
@@ -39,7 +40,7 @@ const TEXTOS_SYNC = {
 
 function textoEstadoFamilia(f) {
   if (!f.codigo) return TEXTOS_SYNC.local;
-  const estado = f.id === getFamiliaActivaId() ? Sync.estado : 'ok';
+  const estado = !sincronizable(f) ? 'enlace' : f.id === getFamiliaActivaId() ? Sync.estado : 'ok';
   return `${TEXTOS_SYNC[estado] || TEXTOS_SYNC.ok} · código ${f.codigo}`;
 }
 
@@ -112,7 +113,7 @@ function abrirFamilia() {
           <button class="fila fila-anadir" data-minombre>${ico('mas')}Pon tu nombre para aparecer aquí</button>` : ''}
       </div>
       ${miembros.length < 2 ? `<p class="campo-ayuda" style="margin-top:10px">${activa.codigo
-        ? 'Todavía no ha entrado nadie más. Pásales el código o el enlace de invitación.'
+        ? 'Todavía no ha entrado nadie más. Mándales la invitación desde el botón de arriba.'
         : 'Ahora mismo solo estás tú. Invita a tu familia y compartiréis listas, recetas y dietas al momento.'}</p>` : ''}
 
       <h3 class="titulo-seccion">${otras.length ? 'Tus otras familias' : 'Otras familias'} ${otras.length ? `<small>${otras.length}</small>` : ''}</h3>
@@ -133,7 +134,7 @@ function abrirFamilia() {
         </div>` : '<p class="campo-ayuda" style="margin-bottom:10px">Por si también organizas otra casa: el piso, la de tus padres…</p>'}
       <div class="grupo-botones" style="margin-top:12px">
         <button class="boton boton-borde boton-pequeno" data-x="nueva">${ico('mas')}Nueva familia</button>
-        <button class="boton boton-borde boton-pequeno" data-x="unirme">${ico('enlace')}Unirme con código</button>
+        <button class="boton boton-borde boton-pequeno" data-x="unirme">${ico('enlace')}Unirme a otra</button>
       </div>
 
       <section class="ajustes-bloque">
@@ -221,14 +222,16 @@ async function salirDeFamilia(id) {
 
   const ok = await confirmar({
     titulo: f.codigo ? `¿Salir de «${f.nombre}»?` : `¿Borrar «${f.nombre}»?`,
-    texto: f.codigo
+    texto: sincronizable(f)
       ? 'Dejarás de verla en este dispositivo y desaparecerás de sus miembros. Los demás la seguirán teniendo y podrás volver con el código.'
-      : 'Se borrarán sus listas, recetas y dietas de este dispositivo. Si quieres conservarla, descarga antes una copia.',
+      : f.codigo
+        ? 'Dejarás de verla en este dispositivo. Los demás la seguirán teniendo y podrás volver si te mandan otra vez la invitación.'
+        : 'Se borrarán sus listas, recetas y dietas de este dispositivo. Si quieres conservarla, descarga antes una copia.',
     boton: f.codigo ? 'Salir' : 'Borrar'
   });
   if (!ok) return;
 
-  if (f.codigo) {
+  if (sincronizable(f)) {
     // Quitarme de los miembros y subirlo antes de borrarla aquí
     actualizarFamilia(id, { miembros: (f.miembros || []).filter(m => m.id !== getYo().id) });
     await empujarCambios(id);
@@ -305,9 +308,31 @@ function enlaceInvitacion(codigo) {
   return `${location.origin}${location.pathname}?familia=${encodeURIComponent(codigo)}`;
 }
 
-function textoInvitacion(f) {
+// Sin servidor, el enlace lleva dentro la familia tal como está ahora
+async function prepararEnlace(id) {
+  const f = getFamiliaPorId(id);
+  if (!f || !f.codigo) return '';
+  const base = enlaceInvitacion(f.codigo);
+  return sincronizable(f) ? base : `${base}#d=${await paqueteFamilia(id)}`;
+}
+
+function textoInvitacion(f, enlace) {
   const quien = getYo().nombre;
-  return `${quien ? `${quien} te invita` : 'Te invitan'} a «${f.nombre}» en NutriPlan para compartir la compra, las recetas y las dietas de la semana:\n${enlaceInvitacion(f.codigo)}\n\nO entra con el código ${f.codigo}`;
+  const invita = `${quien ? `${quien} te invita` : 'Te invitan'} a «${f.nombre}» en NutriPlan`;
+  return sincronizable(f)
+    ? `${invita} para compartir la compra, las recetas y las dietas de la semana:\n${enlace}\n\nO entra con el código ${f.codigo}`
+    : `${invita}. Abre este enlace y tendrás la compra, las recetas y las dietas de la familia (código ${f.codigo}):\n${enlace}`;
+}
+
+/*
+  El enlace se prepara antes del toque: compartir tiene que
+  pedirse justo al tocar o algunos móviles lo bloquean.
+*/
+function enviarInvitacion(id, enlace) {
+  const f = getFamiliaPorId(id);
+  if (!f || !enlace) return;
+  marcarComoEnviada(id);
+  compartirTexto(`NutriPlan · ${f.nombre}`, textoInvitacion(f, enlace));
 }
 
 /*
@@ -328,35 +353,44 @@ function abrirInvitar(id) {
   const cont = d.querySelector('[data-x="contenido"]');
   let intentando = false;
 
-  const pintarCodigo = (f) => {
+  const pintarCodigo = async (f) => {
+    const enVivo = sincronizable(f);
     cont.innerHTML = `
-      <p class="campo-ayuda" style="font-size:14.5px">Quien abra el enlace o escriba el código entrará en «${esc(f.nombre)}»: veréis la misma compra, las recetas y las dietas, y los cambios de cada uno al momento. No hace falta cuenta.</p>
+      <p class="campo-ayuda" style="font-size:14.5px">${enVivo
+        ? `Quien abra el enlace o escriba el código entrará en «${esc(f.nombre)}»: veréis la misma compra, las recetas y las dietas, y los cambios de cada uno al momento. No hace falta cuenta.`
+        : `Quien abra el enlace tendrá «${esc(f.nombre)}» con todo lo que hay ahora: la compra, las recetas y las dietas. No hace falta cuenta.`}</p>
       <span class="codigo-grande" aria-label="Código ${esc(f.codigo.split('').join(' '))}">${esc(f.codigo)}</span>
       <div class="grupo-botones">
-        <button class="boton boton-primario" style="flex:1" data-x="enlace">${ico('compartir')}Enviar invitación</button>
-        <button class="boton boton-secundario" style="flex:1" data-x="codigo">${ico('copiar')}Copiar código</button>
+        <button class="boton boton-primario" style="flex:1" data-x="enlace" disabled>${ico('compartir')}Enviar invitación</button>
+        <button class="boton boton-secundario" style="flex:1" data-x="copiar">${ico('copiar')}${enVivo ? 'Copiar código' : 'Copiar enlace'}</button>
       </div>
+      ${enVivo ? '' : `
+        <p class="campo-ayuda nota-enlace">Los cambios no se pasan solos de un móvil a otro. Para poneros al día, cualquiera vuelve a enviar la invitación y, al abrirla, se juntan las dos versiones sin perder nada.</p>`}
     `;
-    cont.querySelector('[data-x="enlace"]').addEventListener('click', () => {
-      compartirTexto(`NutriPlan · ${f.nombre}`, textoInvitacion(f));
-    });
-    cont.querySelector('[data-x="codigo"]').addEventListener('click', async () => {
+    const botonEnviar = cont.querySelector('[data-x="enlace"]');
+    let enlace = '';
+    botonEnviar.addEventListener('click', () => enviarInvitacion(f.id, enlace));
+    cont.querySelector('[data-x="copiar"]').addEventListener('click', async () => {
+      const texto = enVivo ? f.codigo : enlace;
+      if (!texto) return;
       try {
-        await navigator.clipboard.writeText(f.codigo);
-        aviso(`Código ${f.codigo} copiado`);
+        await navigator.clipboard.writeText(texto);
+        if (!enVivo) marcarComoEnviada(f.id);
+        aviso(enVivo ? `Código ${f.codigo} copiado` : 'Enlace copiado. Pégalo donde quieras.');
       } catch (e) {
-        aviso(`El código es ${f.codigo}`);
+        aviso(enVivo ? `El código es ${f.codigo}` : 'No se ha podido copiar el enlace', { tipo: enVivo ? 'info' : 'error' });
       }
     });
+
+    enlace = await prepararEnlace(f.id);
+    botonEnviar.disabled = !enlace;
   };
 
   const pintarProblema = (err) => {
     const motivo = err && err.motivo;
     const queHacer = motivo === 'sin-conexion'
       ? 'En cuanto vuelvas a tener conexión se preparará solo.'
-      : motivo === 'sin-servidor'
-        ? 'Ábrela desde la dirección donde está instalada (la que arranca el servidor) y podrás invitar.'
-        : 'Prueba otra vez en un momento.';
+      : 'Prueba otra vez en un momento.';
     cont.innerHTML = `
       <div class="estado-invitar">
         ${ico(motivo === 'sin-conexion' ? 'sin_conexion' : 'nube')}
@@ -372,7 +406,7 @@ function abrirInvitar(id) {
     cont.querySelector('[data-x="reintentar"]').addEventListener('click', preparar);
   };
 
-  // Una familia local se registra en el servidor la primera vez que se invita
+  // Una familia local recibe su código la primera vez que se invita
   async function preparar() {
     if (intentando || !d.isConnected) return;
     const f = getFamiliaPorId(id);
@@ -463,7 +497,8 @@ function abrirRenombrar() {
           <span class="campo-etiqueta">Nombre</span>
           <input class="entrada" name="nombre" required maxlength="60" value="${esc(f.nombre)}" autocapitalize="sentences" />
         </label>
-        ${f.codigo ? '<p class="campo-ayuda">El nuevo nombre lo verá toda la familia.</p>' : ''}
+        ${sincronizable(f) ? '<p class="campo-ayuda">El nuevo nombre lo verá toda la familia.</p>'
+          : f.codigo ? '<p class="campo-ayuda">Los demás lo verán cuando les vuelvas a enviar la invitación.</p>' : ''}
       </form>
     `,
     pie: `
@@ -491,35 +526,87 @@ function extraerCodigo(texto) {
   return (m ? m[1] : t).replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 }
 
+// La familia que viaja dentro de un enlace (lo que va tras "#d=")
+function extraerDatoEnlace(texto) {
+  const m = String(texto || '').match(/[#&]d=([01][A-Za-z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+
 function htmlCampoCodigo(autofocus = true) {
   return `
     <label class="campo">
-      <span class="campo-etiqueta">Código o enlace</span>
-      <input class="entrada entrada-codigo" name="codigo" required placeholder="Ej.: CASA24" ${autofocus ? 'autofocus' : ''} autocapitalize="characters" autocorrect="off" spellcheck="false" />
-      <span class="campo-ayuda">Te lo pasa alguien que ya está en la familia.</span>
+      <span class="campo-etiqueta">Enlace o código</span>
+      <input class="entrada entrada-codigo" name="codigo" required placeholder="Pega aquí la invitación" ${autofocus ? 'autofocus' : ''} autocapitalize="characters" autocorrect="off" spellcheck="false" />
+      <span class="campo-ayuda">Lo más fácil: abre el enlace que te han mandado. También puedes pegarlo aquí.</span>
     </label>
   `;
 }
 
-// Busca la sala y entra; devuelve true si lo consigue
+// Busca la familia y entra; devuelve true si lo consigue
 async function unirseConCodigo(texto, boton) {
+  const dato = extraerDatoEnlace(texto);
+  if (dato) return entrarDesdeEnlace(dato);
+
   const codigo = extraerCodigo(texto);
   if (codigo.length < 4) {
-    aviso('Ese código no parece correcto', { tipo: 'error' });
+    aviso('Eso no parece un enlace ni un código de NutriPlan', { tipo: 'error' });
     return false;
   }
+  const yaLaTengo = getFamilias().find(f => f.codigo === codigo);
+  if (yaLaTengo) {
+    cambiarAFamilia(yaLaTengo.id);
+    return true;
+  }
+
   const original = boton.textContent;
   boton.disabled = true;
-  boton.textContent = 'Conectando…';
+  boton.textContent = 'Buscando…';
   try {
     entrarEnSala(await obtenerSala(codigo));
     return true;
   } catch (err) {
-    aviso(err.message, { tipo: 'error' });
+    // Sin servidor, el código solo no lleva la familia: hace falta el enlace
+    aviso(err.motivo === 'sin-servidor'
+      ? 'Con el código solo no se puede entrar: pide que te manden la invitación y ábrela o pégala aquí.'
+      : err.message, { tipo: 'error', duracion: 5000 });
     boton.disabled = false;
     boton.textContent = original;
     return false;
   }
+}
+
+/*
+  Abre un enlace con la familia dentro: si es nueva, entras;
+  si ya la tenías, se juntan las dos versiones.
+*/
+async function entrarDesdeEnlace(dato) {
+  let datos;
+  try {
+    datos = await leerPaqueteFamilia(dato);
+  } catch (e) {
+    aviso('La invitación está incompleta o dañada. Pide que te la vuelvan a mandar.', { tipo: 'error', duracion: 5000 });
+    return false;
+  }
+  return unirseConDatos(datos);
+}
+
+function unirseConDatos(datos) {
+  const yaLaTenia = getFamilias().find(f => f.codigo === datos.codigo);
+  if (yaLaTenia && sincronizable(yaLaTenia)) {
+    cambiarAFamilia(yaLaTenia.id);
+    return true;
+  }
+
+  const { familia, nueva } = incorporarDesdeEnlace(datos);
+  if (nueva) quitarFamiliaInicialVacia();
+  diaPlan = indiceHoy();
+  refrescarApp();
+
+  const quien = datos.de && datos.de !== getYo().id ? nombreMiembro(datos.de) : '';
+  aviso(nueva
+    ? `Ya estás en «${familia.nombre}»`
+    : `«${familia.nombre}» al día${quien ? ` con lo que ha mandado ${quien}` : ''}. No se ha perdido nada tuyo.`, { duracion: 4000 });
+  return true;
 }
 
 function abrirUnirme() {
@@ -595,7 +682,7 @@ function abrirBienvenida() {
           </button>
           <button class="opcion-inicio" data-ir="unirme">
             ${ico('enlace')}
-            <span><strong>Unirme a una familia</strong><small>Alguien de casa ya la ha creado y te ha pasado el código.</small></span>
+            <span><strong>Unirme a una familia</strong><small>Alguien de casa ya la ha creado y te ha mandado la invitación.</small></span>
             ${ico('chevron_der', 'ico-final')}
           </button>
           <button class="opcion-inicio" data-ir="solo">
@@ -624,7 +711,7 @@ function abrirBienvenida() {
       return `
         <div class="bienvenida">
           <h2 class="bienvenida-titulo">Listo. Ahora, que entren los demás</h2>
-          <p class="bienvenida-texto">Mándales la invitación o diles este código.</p>
+          <p class="bienvenida-texto">${sincronizable(f) ? 'Mándales la invitación o diles este código.' : 'Mándales la invitación: al abrirla tendrán la familia en su móvil.'}</p>
           <span class="codigo-grande">${esc(f.codigo)}</span>
           <div class="grupo-botones">
             <button type="button" class="boton boton-primario" style="flex:1" data-x="enviar">${ico('compartir')}Enviar invitación</button>
@@ -654,11 +741,14 @@ function abrirBienvenida() {
   });
   const cuerpo = d.querySelector('.hoja-cuerpo');
 
+  let enlaceListo = '';
   const ir = (paso) => {
     cuerpo.innerHTML = pasos[paso]();
     cuerpo.scrollTop = 0;
     const foco = cuerpo.querySelector('[autofocus]');
     if (foco) setTimeout(() => foco.focus(), 60);
+    // El enlace se deja preparado para que compartir salga al primer toque
+    if (paso === 'invitar') prepararEnlace(getFamiliaActivaId()).then(e => { enlaceListo = e; });
   };
   const pasoInicial = getYo().nombre ? 'modo' : 'nombre';
 
@@ -674,7 +764,7 @@ function abrirBienvenida() {
       ir(destino.dataset.ir);
       return;
     }
-    if (e.target.closest('[data-x="enviar"]')) ACCIONES.invitarActiva();
+    if (e.target.closest('[data-x="enviar"]')) enviarInvitacion(getFamiliaActivaId(), enlaceListo);
     if (e.target.closest('[data-x="empezar"]')) {
       await Hoja.cerrar(d, { forzar: true });
       refrescarApp();
@@ -752,13 +842,28 @@ function abrirAvisoFamilias() {
 ------------------------------------------------------- */
 async function verificarParametroFamiliaURL() {
   const params = new URLSearchParams(location.search);
+  const dato = extraerDatoEnlace(location.hash);
   let codigo = params.get('familia') || params.get('partida') || params.get('unirse') || '';
   if (!codigo && /(familia|partida)=/.test(location.hash)) codigo = location.hash.split('=')[1];
   codigo = extraerCodigo(codigo);
-  if (!codigo) return false;
+  if (!codigo && !dato) return false;
 
   // Limpiar la URL para no repetirlo al recargar
   history.replaceState(null, document.title, location.pathname);
+
+  // Invitación con la familia dentro (web sin servidor)
+  if (dato) {
+    let datos;
+    try {
+      datos = await leerPaqueteFamilia(dato);
+    } catch (e) {
+      aviso('La invitación está incompleta o dañada. Pide que te la vuelvan a mandar.', { tipo: 'error', duracion: 5000 });
+      return false;
+    }
+    // Si ya la tienes, se juntan las dos versiones sin preguntar
+    if (getFamilias().some(f => f.codigo === datos.codigo)) return unirseConDatos(datos);
+    return mostrarInvitacion(datos, () => unirseConDatos(datos));
+  }
 
   const yaLaTengo = getFamilias().find(f => f.codigo === codigo);
   if (yaLaTengo) {
@@ -770,10 +875,16 @@ async function verificarParametroFamiliaURL() {
   try {
     sala = await obtenerSala(codigo);
   } catch (err) {
-    aviso(err.message, { tipo: 'error' });
+    aviso(err.motivo === 'sin-servidor'
+      ? 'Ese enlace solo trae el código. Pide que te manden la invitación otra vez desde NutriPlan.'
+      : err.message, { tipo: 'error', duracion: 5000 });
     return false;
   }
+  return mostrarInvitacion(sala, () => entrarEnSala(sala));
+}
 
+// Hoja de "Te han invitado a…"; devuelve una promesa con true si se une
+function mostrarInvitacion(sala, alUnirse) {
   const miembros = sala.miembros || [];
   const sinNombre = !getYo().nombre;
   const nombresDentro = miembros.slice(0, 2).map(m => m.nombre);
@@ -818,7 +929,7 @@ async function verificarParametroFamiliaURL() {
       }
       unido = true;
       await Hoja.cerrar(d);
-      entrarEnSala(sala);
+      alUnirse();
     });
   });
 }
@@ -871,8 +982,5 @@ async function importarCopia(archivo) {
 ------------------------------------------------------- */
 registrarAcciones({
   abrirFamilia: () => abrirFamilia(),
-  invitarActiva: () => {
-    const f = getFamiliaActiva();
-    compartirTexto(`NutriPlan · ${f.nombre}`, textoInvitacion(f));
-  }
+  invitarActiva: () => abrirInvitar(getFamiliaActivaId())
 });

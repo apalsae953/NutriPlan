@@ -1,11 +1,15 @@
 /* =========================================================
-   CAPA DE PERSISTENCIA Y SINCRONIZACIÓN EN VIVO — STORAGE.JS
+   CAPA DE PERSISTENCIA Y SINCRONIZACIÓN — STORAGE.JS
    Sin cuentas de usuario, sin contraseñas, sin correos.
    Cada familia tiene sus listas de la compra, recetas, dietas
    y miembros.
    - Si la familia es local: se guarda en LocalStorage.
-   - Si la familia es compartida (tiene código de sala): se sincroniza
-     con todas las personas que tengan el código.
+   - Si tiene código y hay servidor (server.py): se sincroniza en
+     vivo con todas las personas que tengan el código.
+   - Si tiene código pero la web no tiene servidor (p. ej. en
+     Vercel): el código lo genera el navegador y la familia viaja
+     dentro del enlace de invitación. Al abrir un enlace de una
+     familia que ya tienes, se juntan los cambios de los dos.
 
    Cómo se evitan pérdidas cuando dos personas editan a la vez:
    cada familia guarda una "base" (lo último que se sabe que hay en el
@@ -25,7 +29,7 @@ const STORAGE_KEYS = {
   compraLegacy:     'nutriplan_compra'
 };
 
-const VERSION_APP = '3.2.1';
+const VERSION_APP = '3.4.0';
 
 // Colecciones de cada familia que se sincronizan
 const COLECCIONES = ['dietas', 'comidas', 'compra', 'rapida', 'historial', 'miembros'];
@@ -152,13 +156,39 @@ function getFamiliaActiva() {
 function actualizarFamilia(id, datos, sincronizar = true) {
   const p = getFamiliaPorId(id);
   if (!p) return;
+  if (p.registrada === false) anotarBorrados(p, datos);
   Object.assign(p, datos);
   if (sincronizar) {
     p.cambios = (p.cambios || 0) + 1;
-    if (p.codigo) p.pendiente = true;
+    if (sincronizable(p)) p.pendiente = true;
   }
   guardarFamilias();
-  if (sincronizar && p.codigo) programarSincronizacion(450, id);
+  if (sincronizar && sincronizable(p)) programarSincronizacion(450, id);
+}
+
+// Los miembros no se apuntan: quien vuelve a entrar tiene que poder aparecer
+const COLECCIONES_CON_BORRADOS = ['dietas', 'comidas', 'compra', 'rapida'];
+
+// Familia que se sincroniza en vivo con el servidor
+function sincronizable(p) {
+  return !!(p && p.codigo && p.registrada !== false);
+}
+
+/*
+  En las familias que se comparten por enlace se apunta qué se
+  borra, para que al juntar dos copias no vuelva a aparecer.
+  Si se deshace el borrado, deja de estar apuntado.
+*/
+function anotarBorrados(p, datos) {
+  COLECCIONES_CON_BORRADOS.forEach(col => {
+    if (!Array.isArray(datos[col])) return;
+    const ahora = new Set(datos[col].map(x => x && x.id));
+    const antes = (p.borrados && p.borrados[col]) || [];
+    const quitados = (p[col] || []).map(x => x && x.id).filter(x => x != null && !ahora.has(x));
+    const recuperados = antes.some(x => ahora.has(x));
+    if (!quitados.length && !recuperados) return;
+    p.borrados = { ...(p.borrados || {}), [col]: [...antes.filter(x => !ahora.has(x)), ...quitados].slice(-400) };
+  });
 }
 
 function actualizarFamiliaActiva(datos, sincronizar = true) {
@@ -270,6 +300,7 @@ function fijarEstadoSync(estado) {
 function estadoSyncSegunFamilia() {
   const p = getFamiliaActiva();
   if (!p || !p.codigo) return fijarEstadoSync('local');
+  if (!sincronizable(p)) return fijarEstadoSync('enlace');
   if (p.pendiente) return fijarEstadoSync(navigator.onLine === false ? 'sin-conexion' : 'guardando');
   fijarEstadoSync('ok');
 }
@@ -290,7 +321,7 @@ function programarSincronizacion(retraso = 450, id = getFamiliaActivaId()) {
 ------------------------------------------------------- */
 async function empujarCambios(id = getFamiliaActivaId()) {
   const p = getFamiliaPorId(id);
-  if (!p || !p.codigo || !p.pendiente) {
+  if (!sincronizable(p) || !p.pendiente) {
     estadoSyncSegunFamilia();
     return;
   }
@@ -305,34 +336,25 @@ async function empujarCambios(id = getFamiliaActivaId()) {
   const enviado = instantanea(p);
 
   try {
-    const res = await fetch(`/api/sala/${encodeURIComponent(p.codigo)}/guardar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baseVersion: p.versionRemota || 1, ...enviado })
-    });
-
+    const r = await API.guardar(p.codigo, p.versionRemota || 1, enviado);
     const actual = getFamiliaPorId(id);
     if (!actual) return;
 
-    if (res.status === 409) {
+    if (r.estado === 'conflicto') {
       // Otra persona guardó antes: fusionar y volver a intentar
-      const { sala } = await res.json();
-      fusionarConRemoto(actual, sala);
+      fusionarConRemoto(actual, r.sala);
       guardarFamilias();
       if (id === getFamiliaActivaId()) refrescarDesdeSync();
       Sync.repetir = actual.pendiente;
-    } else if (res.ok) {
-      const data = await res.json();
+    } else if (r.estado === 'ok') {
       actual.base = enviado;
-      actual.versionRemota = data.version;
+      actual.versionRemota = r.version;
       if (actual.cambios === cambiosEnviados) actual.pendiente = false;
       else Sync.repetir = true;
       guardarFamilias();
       if (id === getFamiliaActivaId()) estadoSyncSegunFamilia();
-    } else if (res.status === 404) {
-      if (id === getFamiliaActivaId()) fijarEstadoSync('perdida');
-    } else {
-      throw new Error(`HTTP ${res.status}`);
+    } else if (id === getFamiliaActivaId()) {
+      fijarEstadoSync('perdida');
     }
   } catch (e) {
     if (id === getFamiliaActivaId()) fijarEstadoSync('sin-conexion');
@@ -349,7 +371,7 @@ async function empujarCambios(id = getFamiliaActivaId()) {
 // Al recuperar conexión o al cerrar la app, subir lo que quede pendiente
 function empujarPendientes() {
   getFamilias()
-    .filter(p => p.codigo && p.pendiente)
+    .filter(p => sincronizable(p) && p.pendiente)
     .forEach(p => empujarCambios(p.id));
 }
 
@@ -359,17 +381,14 @@ function empujarPendientes() {
 async function sondearRemoto() {
   if (document.hidden || Sync.enCurso) return;
   const p = getFamiliaActiva();
-  if (!p || !p.codigo) return;
+  if (!sincronizable(p)) return;
 
   try {
-    const res = await fetch(`/api/sala/${encodeURIComponent(p.codigo)}/version`, { cache: 'no-store' });
-    if (res.status === 404) {
+    const version = await API.version(p.codigo);
+    if (version === null) {
       fijarEstadoSync('perdida');
       return;
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const { version } = await res.json();
     if (version > (p.versionRemota || 0)) {
       await traerRemoto(p.id);
     } else if (p.pendiente) {
@@ -384,11 +403,10 @@ async function sondearRemoto() {
 
 async function traerRemoto(id) {
   const p = getFamiliaPorId(id);
-  if (!p || !p.codigo) return;
+  if (!sincronizable(p)) return;
 
-  const res = await fetch(`/api/sala/${encodeURIComponent(p.codigo)}`, { cache: 'no-store' });
-  if (!res.ok) return;
-  const { sala } = await res.json();
+  const sala = await API.obtener(p.codigo).catch(() => null);
+  if (!sala) return;
   if (Sync.enCurso) return; // Hay una subida en marcha; el próximo sondeo lo resolverá
 
   const actual = getFamiliaPorId(id);
@@ -412,15 +430,8 @@ function iniciarSincronizacion() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       // Intentar dejar subido lo pendiente antes de que el sistema congele la app
-      getFamilias().filter(p => p.codigo && p.pendiente).forEach(p => {
-        try {
-          fetch(`/api/sala/${encodeURIComponent(p.codigo)}/guardar`, {
-            method: 'POST',
-            keepalive: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ baseVersion: p.versionRemota || 1, ...instantanea(p) })
-          }).catch(() => {});
-        } catch (e) { /* el siguiente arranque lo reintentará */ }
+      getFamilias().filter(p => sincronizable(p) && p.pendiente).forEach(p => {
+        API.guardarAlCerrar(p.codigo, p.versionRemota || 1, instantanea(p));
       });
     } else {
       sondearRemoto();
@@ -429,12 +440,15 @@ function iniciarSincronizacion() {
 
   window.addEventListener('online', empujarPendientes);
   window.addEventListener('offline', () => {
-    if (getFamiliaActiva()?.codigo) fijarEstadoSync('sin-conexion');
+    if (sincronizable(getFamiliaActiva())) fijarEstadoSync('sin-conexion');
   });
+
+  window.addEventListener('online', subirFamiliasPorEnlace);
 
   estadoSyncSegunFamilia();
   empujarPendientes();
   sondearRemoto();
+  subirFamiliasPorEnlace();
 }
 
 /* -------------------------------------------------------
@@ -530,7 +544,8 @@ function textoErrorServidor(motivo) {
 }
 
 async function llamarServidor(ruta, opciones = {}) {
-  if (!location.protocol.startsWith('http')) throw errorServidor('sin-servidor');
+  // Una ruta relativa (/api/...) necesita que la página la sirva el propio servidor
+  if (!/^https?:/.test(ruta) && !location.protocol.startsWith('http')) throw errorServidor('sin-servidor');
   if (navigator.onLine === false) throw errorServidor('sin-conexion');
 
   const control = new AbortController();
@@ -552,14 +567,104 @@ async function llamarServidor(ruta, opciones = {}) {
   return { res, datos };
 }
 
-async function crearSalaEnServidor(datos) {
-  const { res, datos: respuesta } = await llamarServidor('/api/sala/crear', {
+/* -------------------------------------------------------
+   Dónde se guardan las familias compartidas
+   - Supabase (js/nube.js): lo normal; la web llama directamente
+     a sus funciones con la clave pública. No hay servidor propio.
+   - server.py: solo si no hay nube configurada (uso en local).
+   Las dos opciones responden igual para el resto de la app.
+------------------------------------------------------- */
+const usaNube = () => !!(typeof NUBE !== 'undefined' && NUBE.url && NUBE.clave);
+
+function llamarNube(funcion, args, opciones = {}) {
+  return llamarServidor(`${NUBE.url}/rest/v1/rpc/${funcion}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(datos)
+    headers: { 'Content-Type': 'application/json', apikey: NUBE.clave },
+    body: JSON.stringify(args),
+    ...opciones
   });
-  if (!res.ok) throw errorServidor('sin-respuesta');
-  return respuesta;
+}
+
+const API = {
+  // → { existia: false, codigo, version } o { existia: true, sala } si ese código ya estaba
+  async crear(datos, codigoDeseado = null) {
+    if (usaNube()) {
+      const { res, datos: r } = await llamarNube('crear_sala', { p_datos: datos, p_codigo: codigoDeseado });
+      if (!res.ok || !r) throw errorServidor('sin-respuesta');
+      return r;
+    }
+    const { res, datos: r } = await llamarServidor('/api/sala/crear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos)
+    });
+    if (!res.ok) throw errorServidor('sin-respuesta');
+    return { existia: false, codigo: r.codigo, version: r.version || 1 };
+  },
+
+  // → la familia, o null si no existe
+  async obtener(codigo) {
+    if (usaNube()) {
+      const { res, datos } = await llamarNube('obtener_sala', { p_codigo: codigo });
+      if (!res.ok) throw errorServidor('sin-respuesta');
+      return datos || null;
+    }
+    const { res, datos } = await llamarServidor(`/api/sala/${encodeURIComponent(codigo)}`);
+    if (res.status === 404) return null;
+    if (!res.ok || !datos.sala) throw errorServidor('sin-respuesta');
+    return datos.sala;
+  },
+
+  // → número de versión, o null si no existe
+  async version(codigo) {
+    if (usaNube()) {
+      const { res, datos } = await llamarNube('version_sala', { p_codigo: codigo });
+      if (!res.ok) throw errorServidor('sin-respuesta');
+      return typeof datos === 'number' ? datos : null;
+    }
+    const { res, datos } = await llamarServidor(`/api/sala/${encodeURIComponent(codigo)}/version`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw errorServidor('sin-respuesta');
+    return datos.version;
+  },
+
+  // → { estado: 'ok', version } | { estado: 'conflicto', sala } | { estado: 'no-existe' }
+  async guardar(codigo, baseVersion, datos) {
+    if (usaNube()) {
+      const { res, datos: r } = await llamarNube('guardar_sala', { p_codigo: codigo, p_base_version: baseVersion, p_datos: datos });
+      if (!res.ok || !r) throw errorServidor('sin-respuesta');
+      if (r.ok) return { estado: 'ok', version: r.version };
+      if (r.conflicto) return { estado: 'conflicto', sala: r.sala };
+      return { estado: 'no-existe' };
+    }
+    const { res, datos: r } = await llamarServidor(`/api/sala/${encodeURIComponent(codigo)}/guardar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseVersion, ...datos })
+    });
+    if (res.status === 409) return { estado: 'conflicto', sala: r.sala };
+    if (res.status === 404) return { estado: 'no-existe' };
+    if (!res.ok) throw errorServidor('sin-respuesta');
+    return { estado: 'ok', version: r.version };
+  },
+
+  // Al cerrar o esconder la app: se intenta subir sin esperar respuesta
+  guardarAlCerrar(codigo, baseVersion, datos) {
+    try {
+      const peticion = usaNube()
+        ? llamarNube('guardar_sala', { p_codigo: codigo, p_base_version: baseVersion, p_datos: datos }, { keepalive: true })
+        : llamarServidor(`/api/sala/${encodeURIComponent(codigo)}/guardar`, {
+          method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseVersion, ...datos })
+        });
+      peticion.catch(() => {});
+    } catch (e) { /* el siguiente arranque lo reintentará */ }
+  }
+};
+
+async function crearSalaEnServidor(datos) {
+  return API.crear(datos);
 }
 
 // Crea una familia nueva. Si compartida=true intenta registrarla en el servidor.
@@ -585,7 +690,9 @@ async function crearNuevaFamilia(nombre, descripcion = '', compartida = true, da
       nueva.base = instantanea(nueva);
       nueva.pendiente = false;
     } catch (e) {
-      sinServidor = true;
+      // Sin servidor: el código lo pone el navegador y se comparte por enlace
+      if (e.motivo === 'sin-servidor') darCodigoLocal(nueva);
+      else sinServidor = true;
     }
   }
 
@@ -597,18 +704,261 @@ async function crearNuevaFamilia(nombre, descripcion = '', compartida = true, da
   return { familia: nueva, sinServidor };
 }
 
+/*
+  Da código a una familia de este dispositivo para poder invitar.
+  Con servidor queda sincronizada en vivo; si la web no tiene
+  servidor, el código se genera aquí y se comparte por enlace.
+  Solo falla si hay servidor pero ahora no responde.
+*/
 async function convertirEnCompartida(id) {
   asegurarMiembro(id);
   const p = getFamiliaPorId(id);
   if (!p) return null;
-  const data = await crearSalaEnServidor(instantanea(p));
-  p.codigo = data.codigo;
-  p.versionRemota = data.version || 1;
-  p.base = instantanea(p);
-  p.pendiente = false;
+  try {
+    const data = await crearSalaEnServidor(instantanea(p));
+    p.codigo = data.codigo;
+    p.versionRemota = data.version || 1;
+    p.base = instantanea(p);
+    p.pendiente = false;
+  } catch (e) {
+    if (e.motivo !== 'sin-servidor') throw e;
+    darCodigoLocal(p);
+  }
   guardarFamilias();
   if (id === getFamiliaActivaId()) estadoSyncSegunFamilia();
   return p;
+}
+
+const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Sin 0/O ni 1/I, como el servidor
+
+function generarCodigoFamilia() {
+  const azar = crypto.getRandomValues(new Uint32Array(6));
+  return Array.from(azar, n => ALFABETO_CODIGO[n % ALFABETO_CODIGO.length]).join('');
+}
+
+function darCodigoLocal(p) {
+  p.codigo = generarCodigoFamilia();
+  p.registrada = false;
+  p.borrados = {};
+  p.base = instantanea(p);
+  p.pendiente = false;
+}
+
+/* -------------------------------------------------------
+   Compartir por enlace (sin servidor)
+   La familia viaja comprimida en el enlace, detrás de la #
+   (esa parte no llega a ningún servidor). Se queda fuera el
+   historial de sugerencias, que es de cada móvil.
+------------------------------------------------------- */
+function aBase64Url(bytes) {
+  let binario = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binario += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(binario).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function deBase64Url(texto) {
+  const b64 = texto.replace(/-/g, '+').replace(/_/g, '/');
+  const binario = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+  return Uint8Array.from(binario, c => c.charCodeAt(0));
+}
+
+// "1…" = comprimido; "0…" = sin comprimir (navegadores sin CompressionStream)
+async function comprimirTexto(texto) {
+  const bytes = new TextEncoder().encode(texto);
+  if (typeof CompressionStream === 'undefined') return `0${aBase64Url(bytes)}`;
+  const flujo = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  return `1${aBase64Url(new Uint8Array(await new Response(flujo).arrayBuffer()))}`;
+}
+
+async function descomprimirTexto(dato) {
+  const bytes = deBase64Url(dato.slice(1));
+  if (dato[0] === '0') return new TextDecoder().decode(bytes);
+  if (dato[0] !== '1' || typeof DecompressionStream === 'undefined') throw new Error('Formato desconocido');
+  const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Response(flujo).text();
+}
+
+async function paqueteFamilia(id) {
+  const p = getFamiliaPorId(id);
+  const s = instantanea(p);
+  delete s.historial;
+  return comprimirTexto(JSON.stringify({ v: 1, codigo: p.codigo, de: getYo().id, borrados: p.borrados || {}, ...s }));
+}
+
+// Lee y limpia lo que llega en un enlace (viene de fuera: no se da nada por bueno)
+async function leerPaqueteFamilia(dato) {
+  if (!/^[01][A-Za-z0-9_-]+$/.test(dato || '') || dato.length > 3000000) throw new Error('Enlace no válido');
+  const texto = await descomprimirTexto(dato);
+  if (texto.length > 8000000) throw new Error('Enlace demasiado grande');
+  const d = JSON.parse(texto);
+  const codigo = String((d && d.codigo) || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
+  if (!d || d.v !== 1 || codigo.length < 4) throw new Error('Enlace no válido');
+
+  const limpio = {
+    codigo,
+    nombre: String(d.nombre || 'Familia').slice(0, 80),
+    descripcion: String(d.descripcion || '').slice(0, 500),
+    de: String(d.de || ''),
+    borrados: {}
+  };
+  COLECCIONES.forEach(col => {
+    if (col === 'historial') return;
+    limpio[col] = (Array.isArray(d[col]) ? d[col] : [])
+      .filter(x => x && typeof x === 'object' && !Array.isArray(x) && (typeof x.id === 'string' || typeof x.id === 'number'))
+      .slice(0, 3000);
+    const b = d.borrados && Array.isArray(d.borrados[col]) ? d.borrados[col] : [];
+    limpio.borrados[col] = b.filter(x => typeof x === 'string' || typeof x === 'number').slice(-400);
+  });
+  return limpio;
+}
+
+// Lo enviado pasa a ser la referencia para juntar lo que vuelva
+function marcarComoEnviada(id) {
+  const p = getFamiliaPorId(id);
+  if (!p || sincronizable(p)) return;
+  p.base = instantanea(p);
+  guardarFamilias();
+}
+
+/*
+  Junta dos copias de la misma lista sin perder nada:
+  - lo borrado por cualquiera de los dos (apuntado) desaparece
+  - si solo la otra persona cambió algo, gana su versión
+  - si lo cambiasteis los dos, se queda el tuyo
+  - lo nuevo de cada lado se conserva
+*/
+function unirListas(base, local, remoto, borrados) {
+  const porId = (lista) => new Map(lista.filter(x => x && x.id != null).map(x => [x.id, x]));
+  const mBase = porId(base);
+  const mLocal = porId(local);
+  const mRemoto = porId(remoto);
+  const resultado = [];
+
+  local.forEach(l => {
+    if (!l || l.id == null || borrados.has(l.id)) return;
+    const r = mRemoto.get(l.id);
+    const b = mBase.get(l.id);
+    resultado.push(r && b && iguales(b, l) && !iguales(b, r) ? r : l);
+  });
+
+  remoto.forEach((r, i) => {
+    if (!r || r.id == null || mLocal.has(r.id) || borrados.has(r.id)) return;
+    // Detrás del elemento que tenía delante en la otra copia
+    let pos = resultado.length;
+    for (let j = i - 1; j >= 0; j--) {
+      const k = resultado.findIndex(x => x.id === remoto[j].id);
+      if (k >= 0) {
+        pos = k + 1;
+        break;
+      }
+    }
+    resultado.splice(pos, 0, r);
+  });
+  return resultado;
+}
+
+/*
+  Entra en una familia recibida por enlace o, si ya la tienes,
+  la pone al día juntando las dos copias.
+  Devuelve { familia, nueva }.
+*/
+function incorporarDesdeEnlace(datos) {
+  const familias = getFamilias();
+  let p = familias.find(x => x.codigo === datos.codigo);
+  const nueva = !p;
+
+  if (p && sincronizable(p)) {
+    // Ya se sincroniza en vivo con el servidor: no hace falta juntar nada
+  } else if (p) {
+    juntarCopias(p, datos);
+    p.base = instantanea({ ...datos, historial: [] });
+    p.cambios = (p.cambios || 0) + 1;
+  } else {
+    p = normalizarFamilia({
+      id: generarId('familia'),
+      codigo: datos.codigo,
+      registrada: false,
+      nombre: datos.nombre,
+      descripcion: datos.descripcion,
+      creadaEn: Date.now(),
+      versionRemota: 1,
+      ...datosVacios(),
+      borrados: datos.borrados
+    });
+    COLECCIONES.forEach(col => { if (col !== 'historial') p[col] = clonar(datos[col] || []); });
+    p.base = instantanea({ ...datos, historial: [] });
+    p.pendiente = false;
+    familias.unshift(p);
+  }
+
+  setFamilias(familias);
+  setFamiliaActivaId(p.id);
+  asegurarMiembro(p.id);
+  // Si hay nube, desde ahora se sincroniza en vivo
+  subirFamiliasPorEnlace();
+  return { familia: p, nueva };
+}
+
+// Junta en p otra copia de la misma familia sin perder lo de ninguno
+function juntarCopias(p, datos) {
+  const base = p.base || {};
+  const borrados = {};
+  COLECCIONES.forEach(col => {
+    if (col === 'historial') return;
+    const juntos = COLECCIONES_CON_BORRADOS.includes(col)
+      ? new Set([...((p.borrados || {})[col] || []), ...(((datos.borrados || {})[col]) || [])])
+      : new Set();
+    if (juntos.size) borrados[col] = [...juntos].slice(-400);
+    p[col] = unirListas(base[col] || [], p[col] || [], Array.isArray(datos[col]) ? datos[col] : [], juntos);
+  });
+  p.borrados = borrados;
+  if (!p.base || p.nombre === base.nombre) p.nombre = datos.nombre || p.nombre;
+  if (!p.base || p.descripcion === base.descripcion) p.descripcion = datos.descripcion || '';
+}
+
+/*
+  Familias que se compartían por enlace (sin servidor): en cuanto
+  hay nube se suben con su mismo código y pasan a ir en vivo. Si
+  otro miembro la subió antes, se juntan las dos copias.
+*/
+let subiendoEnlaces = false;
+
+async function subirFamiliasPorEnlace() {
+  if (!usaNube() || subiendoEnlaces) return;
+  const pendientes = getFamilias().filter(f => f.codigo && f.registrada === false);
+  if (!pendientes.length) return;
+
+  subiendoEnlaces = true;
+  try {
+    for (const f of pendientes) {
+      try {
+        const r = await API.crear(instantanea(f), f.codigo);
+        const p = getFamiliaPorId(f.id);
+        if (!p || p.registrada !== false) continue;
+
+        if (r.existia) {
+          juntarCopias(p, r.sala);
+          p.versionRemota = r.sala.version;
+          p.base = instantanea(r.sala);
+          p.pendiente = !iguales(instantanea(p), p.base);
+        } else {
+          p.versionRemota = r.version;
+          p.base = instantanea(p);
+          p.pendiente = false;
+        }
+        delete p.registrada;
+        delete p.borrados;
+        guardarFamilias();
+        if (p.pendiente) programarSincronizacion(50, p.id);
+        if (p.id === getFamiliaActivaId()) refrescarDesdeSync();
+      } catch (e) {
+        // Sin conexión: se intentará otra vez al volver a tenerla
+      }
+    }
+  } finally {
+    subiendoEnlaces = false;
+    estadoSyncSegunFamilia();
+  }
 }
 
 function duplicarFamilia(id) {
@@ -645,10 +995,9 @@ function renombrarFamiliaActiva(nombre, descripcion) {
 }
 
 async function obtenerSala(codigo) {
-  const { res, datos } = await llamarServidor(`/api/sala/${encodeURIComponent(codigo)}`);
-  if (res.status === 404) throw errorServidor('no-existe', 'No hay ninguna familia con ese código. Revisa que esté bien escrito.');
-  if (!res.ok || !datos.sala) throw errorServidor('sin-respuesta');
-  return datos.sala;
+  const sala = await API.obtener(codigo);
+  if (!sala) throw errorServidor('no-existe', 'No hay ninguna familia con ese código. Revisa que esté bien escrito.');
+  return sala;
 }
 
 // Añade (o actualiza) la sala en la lista local y la activa

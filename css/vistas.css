@@ -76,7 +76,8 @@
 .punto-sync[data-estado="guardando"]    { background: var(--aviso); animation: latido 1.2s ease-in-out infinite; }
 .punto-sync[data-estado="sin-conexion"] { background: var(--tinta-3); }
 .punto-sync[data-estado="perdida"]      { background: var(--peligro); }
-.punto-sync[data-estado="local"]        { display: none; }
+.punto-sync[data-estado="local"],
+.punto-sync[data-estado="enlace"]       { display: none; }
 
 @keyframes latido {
   50% { opacity: .35; }
@@ -1408,4 +1409,10 @@
   margin: 10px 0 18px;
   font-size: 14px;
   color: var(--tinta-2);
+}
+
+.nota-enlace {
+  margin-top: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
 }
