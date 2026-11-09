@@ -1,0 +1,993 @@
+/* =========================================================
+   COMPONENTES — Botones, campos, chips, listas, hojas y avisos
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   Botones
+--------------------------------------------------------- */
+.boton {
+  height: 46px;
+  padding: 0 18px;
+  border-radius: var(--r-m);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: transform .12s var(--ease-out), background-color .15s, color .15s, box-shadow .15s;
+}
+
+.boton .ico {
+  width: 20px;
+  height: 20px;
+}
+
+.boton:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+.boton-primario {
+  background: var(--acento);
+  color: var(--sobre-acento);
+}
+
+.boton-secundario {
+  background: var(--superficie-2);
+  color: var(--tinta);
+}
+
+.boton-borde {
+  background: var(--superficie);
+  color: var(--tinta);
+  box-shadow: inset 0 0 0 1px var(--linea);
+}
+
+.boton-peligro {
+  background: var(--peligro);
+  color: #fff;
+}
+
+.boton-secundario.peligro {
+  color: var(--peligro);
+}
+
+.boton-texto {
+  height: auto;
+  padding: 6px 2px;
+  color: var(--acento);
+}
+
+.boton-texto.peligro {
+  color: var(--peligro);
+}
+
+.boton-pequeno {
+  height: 36px;
+  padding: 0 13px;
+  border-radius: var(--r-s);
+  font-size: 14px;
+}
+
+.boton-bloque {
+  width: 100%;
+}
+
+.boton-icono {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-s);
+  display: inline-grid;
+  place-items: center;
+  color: var(--tinta-2);
+  flex-shrink: 0;
+  transition: transform .12s var(--ease-out), background-color .15s, color .15s;
+}
+
+.boton-icono:active {
+  transform: scale(.92);
+  background: var(--superficie-2);
+}
+
+.boton-icono.boton-borde {
+  color: var(--tinta);
+}
+
+.boton-icono.boton-primario {
+  color: var(--sobre-acento);
+}
+
+.boton-icono.peligro {
+  color: var(--peligro);
+}
+
+.boton-icono.pequeno {
+  width: 34px;
+  height: 34px;
+}
+
+.boton-icono.pequeno .ico {
+  width: 19px;
+  height: 19px;
+}
+
+.grupo-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ---------------------------------------------------------
+   Campos de formulario
+--------------------------------------------------------- */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.campo-etiqueta {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tinta-2);
+}
+
+.campo-ayuda {
+  font-size: 13px;
+  color: var(--tinta-3);
+}
+
+.entrada {
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 14px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-m);
+  background: var(--superficie);
+  font-size: 16px; /* 16px evita el zoom automático de iOS */
+  line-height: 1.35;
+  transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.entrada::placeholder {
+  color: var(--tinta-3);
+}
+
+.entrada:focus {
+  outline: none;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 3px var(--acento-suave);
+}
+
+textarea.entrada {
+  min-height: 96px;
+  resize: vertical;
+}
+
+select.entrada {
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d867b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+}
+
+.fila-campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fila-campos .campo {
+  min-width: 0;
+}
+
+.campos-macros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.campos-macros .campo {
+  margin-bottom: 0;
+}
+
+.campos-macros .entrada {
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.con-sufijo {
+  position: relative;
+}
+
+.con-sufijo .entrada {
+  padding-right: 28px;
+}
+
+.con-sufijo::after {
+  content: attr(data-sufijo);
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: var(--tinta-3);
+  pointer-events: none;
+}
+
+.separador-formulario {
+  margin: 22px 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* ---------------------------------------------------------
+   Buscador
+--------------------------------------------------------- */
+.buscador {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.buscador .ico {
+  position: absolute;
+  left: 12px;
+  width: 19px;
+  height: 19px;
+  color: var(--tinta-3);
+  pointer-events: none;
+}
+
+.buscador input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px 0 40px;
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--superficie-2);
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.buscador input::placeholder {
+  color: var(--tinta-3);
+}
+
+.buscador input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acento);
+}
+
+.buscador input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.herramientas {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* ---------------------------------------------------------
+   Desplazamiento horizontal (chips, días, sugerencias)
+--------------------------------------------------------- */
+.scroll-x {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--margen);
+  scrollbar-width: none;
+  margin: 0 calc(var(--margen) * -1);
+  padding: 2px var(--margen);
+}
+
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-x > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------
+   Chips
+--------------------------------------------------------- */
+.chip {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--superficie);
+  box-shadow: inset 0 0 0 1px var(--linea);
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--tinta-2);
+  white-space: nowrap;
+  transition: background-color .15s, color .15s, transform .12s var(--ease-out);
+}
+
+.chip:active {
+  transform: scale(.96);
+}
+
+.chip .ico {
+  width: 17px;
+  height: 17px;
+}
+
+.chip[aria-pressed="true"],
+.chip.activo {
+  background: var(--tinta);
+  color: var(--fondo);
+  box-shadow: none;
+}
+
+.chip-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chips-fila {
+  margin-bottom: 18px;
+}
+
+/* ---------------------------------------------------------
+   Control segmentado y pestañas
+--------------------------------------------------------- */
+.segmentado {
+  display: flex;
+  padding: 3px;
+  border-radius: var(--r-m);
+  background: var(--superficie-2);
+  gap: 2px;
+}
+
+.segmento {
+  flex: 1;
+  position: relative;
+}
+
+.segmento input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmento span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 6px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tinta-2);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color .18s, color .18s, box-shadow .18s;
+}
+
+.segmento input:checked + span {
+  background: var(--superficie);
+  color: var(--tinta);
+  box-shadow: var(--sombra-1);
+}
+
+.segmento input:focus-visible + span {
+  outline: 2px solid var(--acento);
+}
+
+.pestanas {
+  display: flex;
+  padding: 4px;
+  border-radius: var(--r-l);
+  background: var(--superficie-2);
+  margin-bottom: 18px;
+}
+
+.pestana {
+  flex: 1;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tinta-2);
+  transition: background-color .18s, color .18s, box-shadow .18s;
+}
+
+.pestana .ico {
+  width: 19px;
+  height: 19px;
+}
+
+.pestana[aria-selected="true"] {
+  background: var(--superficie);
+  color: var(--tinta);
+  box-shadow: var(--sombra-1);
+}
+
+.pestana-num {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--superficie-3);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--tinta-2);
+}
+
+.pestana[aria-selected="true"] .pestana-num {
+  background: var(--acento-suave);
+  color: var(--acento);
+}
+
+.pestana-num:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------
+   Listas agrupadas (estilo ajustes de iOS)
+--------------------------------------------------------- */
+.lista {
+  background: var(--superficie);
+  border-radius: var(--r-l);
+  box-shadow: var(--sombra-1);
+  overflow: hidden;
+}
+
+.lista > * + * {
+  box-shadow: inset 0 .5px 0 var(--linea);
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+  width: 100%;
+  text-align: left;
+  transition: background-color .12s;
+}
+
+button.fila:active,
+.fila.tocable:active {
+  background: var(--superficie-2);
+}
+
+.fila-texto {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fila-titulo {
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.fila-detalle {
+  font-size: 13.5px;
+  color: var(--tinta-3);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fila .ico-final {
+  color: var(--tinta-3);
+  width: 18px;
+  height: 18px;
+}
+
+/* ---------------------------------------------------------
+   Casilla redonda (marcar como comprado)
+--------------------------------------------------------- */
+.casilla {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 2px var(--linea-fuerte);
+  color: transparent;
+  transition: background-color .18s var(--ease-out), box-shadow .18s, color .18s;
+}
+
+.casilla .ico {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.6;
+}
+
+.marcado .casilla {
+  background: var(--acento);
+  box-shadow: none;
+  color: var(--sobre-acento);
+  animation: marcar .28s var(--ease-out);
+}
+
+@keyframes marcar {
+  0%   { transform: scale(.8); }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* ---------------------------------------------------------
+   Etiqueta de toma (desayuno, almuerzo...)
+--------------------------------------------------------- */
+.toma {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--tinta-2);
+  letter-spacing: .01em;
+}
+
+.toma::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 2.5px;
+  background: var(--color-toma, var(--tinta-3));
+}
+
+.toma-Desayuno { --color-toma: var(--toma-desayuno); }
+.toma-Almuerzo { --color-toma: var(--toma-almuerzo); }
+.toma-Merienda { --color-toma: var(--toma-merienda); }
+.toma-Cena     { --color-toma: var(--toma-cena); }
+
+/* ---------------------------------------------------------
+   Estado vacío
+--------------------------------------------------------- */
+.vacio {
+  padding: 28px 0 24px;
+  text-align: left;
+}
+
+.vacio-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: 24px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin-bottom: 8px;
+}
+
+.vacio-texto {
+  color: var(--tinta-2);
+  max-width: 38ch;
+  margin-bottom: 20px;
+}
+
+.vacio-compacto {
+  padding: 22px 16px;
+  border-radius: var(--r-l);
+  border: 1.5px dashed var(--linea-fuerte);
+  color: var(--tinta-2);
+  font-size: 15px;
+}
+
+.vacio-compacto p {
+  margin-bottom: 14px;
+}
+
+/* ---------------------------------------------------------
+   Nota en línea (avisos discretos dentro de una vista)
+--------------------------------------------------------- */
+.nota-linea {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-m);
+  background: var(--superficie-2);
+  font-size: 14px;
+  color: var(--tinta-2);
+  margin-bottom: 16px;
+}
+
+.nota-linea .ico {
+  width: 18px;
+  height: 18px;
+  color: var(--tinta-3);
+}
+
+.nota-linea span {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------
+   Hojas (dialog) — bottom sheet en móvil
+--------------------------------------------------------- */
+dialog.hoja {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(24, 18, 8, 0);
+  color: var(--tinta);
+  overflow: hidden;
+  transition: background-color .28s var(--ease-out);
+}
+
+dialog.hoja[open] {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+dialog.hoja::backdrop {
+  background: transparent;
+}
+
+dialog.hoja.abierta {
+  background: rgba(24, 18, 8, .38);
+}
+
+dialog.hoja.cerrando {
+  background: rgba(24, 18, 8, 0);
+  transition-duration: .2s;
+}
+
+.hoja-caja {
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100dvh - var(--seguro-arriba) - 28px);
+  display: flex;
+  flex-direction: column;
+  background: var(--superficie);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--sombra-3);
+  transform: translateY(100%);
+  transition: transform .34s var(--ease-out);
+  will-change: transform;
+}
+
+.hoja.abierta .hoja-caja {
+  transform: none;
+}
+
+.hoja.cerrando .hoja-caja {
+  transform: translateY(100%);
+  transition: transform .2s cubic-bezier(.4, 0, 1, 1);
+}
+
+.hoja-asa {
+  flex-shrink: 0;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: grab;
+}
+
+.hoja-asa span {
+  width: 38px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--linea-fuerte);
+}
+
+.hoja-cabecera {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 12px 10px 20px;
+  touch-action: none;
+}
+
+.hoja-titulos {
+  flex: 1;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.hoja-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: 23px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.hoja-subtitulo {
+  margin-top: 3px;
+  font-size: 14px;
+  color: var(--tinta-3);
+}
+
+.hoja-cerrar {
+  background: var(--superficie-2);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+}
+
+.hoja-cerrar .ico {
+  width: 18px;
+  height: 18px;
+}
+
+.hoja-cuerpo {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 20px 20px;
+}
+
+.hoja-cuerpo:last-child {
+  padding-bottom: calc(24px + var(--seguro-abajo));
+}
+
+.hoja-pie {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  padding: 12px 20px calc(12px + var(--seguro-abajo));
+  box-shadow: 0 -.5px 0 var(--linea);
+}
+
+.hoja-pie .boton {
+  flex: 1;
+}
+
+.hoja-pie .boton-icono {
+  flex: 0 0 auto;
+  height: 46px;
+  width: 46px;
+}
+
+/* Alertas de confirmación */
+.hoja-alerta .hoja-caja {
+  max-width: 440px;
+}
+
+.hoja-alerta .hoja-cuerpo {
+  padding-top: 8px;
+}
+
+.alerta-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: 22px;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.alerta-texto {
+  color: var(--tinta-2);
+}
+
+/* Menús de acciones */
+.hoja-menu .hoja-caja {
+  max-width: 480px;
+}
+
+.menu-lista {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -8px;
+}
+
+.menu-opcion {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: var(--r-m);
+  text-align: left;
+  font-size: 16px;
+  font-weight: 550;
+  transition: background-color .12s;
+}
+
+.menu-opcion:active {
+  background: var(--superficie-2);
+}
+
+.menu-opcion .ico {
+  color: var(--tinta-2);
+}
+
+.menu-opcion-texto {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-opcion-texto small {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--tinta-3);
+}
+
+.menu-opcion.peligro,
+.menu-opcion.peligro .ico {
+  color: var(--peligro);
+}
+
+/* En pantallas anchas: ventana centrada */
+@media (min-width: 720px) {
+  dialog.hoja[open] {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .hoja-caja {
+    border-radius: var(--r-xl);
+    max-height: min(820px, calc(100dvh - 48px));
+    transform: translateY(16px) scale(.97);
+    opacity: 0;
+    transition: transform .26s var(--ease-out), opacity .2s;
+  }
+
+  .hoja.abierta .hoja-caja {
+    transform: none;
+    opacity: 1;
+  }
+
+  .hoja.cerrando .hoja-caja {
+    transform: translateY(8px) scale(.98);
+    opacity: 0;
+    transition: transform .16s ease-in, opacity .16s;
+  }
+
+  .hoja-asa {
+    display: none;
+  }
+
+  .hoja-cabecera {
+    padding-top: 18px;
+  }
+
+  .hoja-cuerpo:last-child,
+  .hoja-pie {
+    padding-bottom: 18px;
+  }
+}
+
+/* ---------------------------------------------------------
+   Avisos (toasts)
+--------------------------------------------------------- */
+.avisos {
+  position: fixed;
+  inset: auto 0 calc(var(--nav-alto) + var(--seguro-abajo) + 14px) 0;
+  margin: 0 auto;
+  width: min(calc(100% - 28px), 460px);
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* Con el botón flotante visible, los avisos quedan por encima de él */
+body:has(.fab:not(.oculto)) .avisos {
+  bottom: calc(var(--nav-alto) + var(--seguro-abajo) + 80px);
+}
+
+.aviso {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 10px 10px 16px;
+  border-radius: var(--r-m);
+  background: var(--tinta);
+  color: var(--fondo);
+  font-size: 14.5px;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, .35);
+  animation: avisoEntra .3s var(--ease-out);
+}
+
+.aviso-error {
+  background: var(--peligro);
+  color: #fff;
+}
+
+.aviso-texto {
+  flex: 1;
+  padding: 2px 0;
+}
+
+.aviso-accion {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-s);
+  color: var(--aviso-accion);
+  font-weight: 700;
+  font-size: 14.5px;
+}
+
+.aviso-accion:active {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.aviso-error .aviso-accion {
+  color: #fff;
+}
+
+.aviso.saliendo {
+  animation: avisoSale .18s ease-in forwards;
+}
+
+@keyframes avisoEntra {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes avisoSale {
+  to { opacity: 0; transform: translateY(6px) scale(.98); }
+}
+
+@media (min-width: 960px) {
+  .avisos,
+  body:has(.fab:not(.oculto)) .avisos {
+    bottom: 28px;
+  }
+}
+
+/* ---------------------------------------------------------
+   Interacciones con ratón
+--------------------------------------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .boton-primario:hover { background: var(--acento-fuerte); }
+  .boton-secundario:hover { background: var(--superficie-3); }
+  .boton-borde:hover { box-shadow: inset 0 0 0 1px var(--linea-fuerte); }
+  .boton-icono:hover { background: var(--superficie-2); color: var(--tinta); }
+  .boton-icono.boton-primario:hover { background: var(--acento-fuerte); color: var(--sobre-acento); }
+  .chip:not(.activo):not([aria-pressed="true"]):hover { box-shadow: inset 0 0 0 1px var(--linea-fuerte); color: var(--tinta); }
+  button.fila:hover, .fila.tocable:hover { background: var(--fondo); }
+  .menu-opcion:hover { background: var(--superficie-2); }
+  .pestana:not([aria-selected="true"]):hover { color: var(--tinta); }
+  .boton-texto:hover { text-decoration: underline; text-underline-offset: 3px; }
+}

@@ -1,361 +1,817 @@
 /* =========================================================
-   MÓDULO DE LISTA DE LA COMPRA
-   Gestiona la vista de compra: renderizado por categorías,
-   checkboxes, notas expandibles, añadir y editar ingredientes.
+   MÓDULO DE LA COMPRA
+   - Lista rápida: se escribe y se añade al momento; cuando
+     está todo comprado se vacía de un toque.
+   - Lista fija: lo de siempre. No se borra; se marca en el
+     súper y se desmarca al volver.
    ========================================================= */
 
-// Configuración de categorías: icono (emoji o texto) y clase CSS
-const CATEGORIAS_CONFIG = {
-  'Carnes y pescados':    { emoji: '🥩', clase: 'cat-carnes',      icono: 'beef' },
-  'Lácteos y huevos':     { emoji: '🥚', clase: 'cat-lacteos',     icono: 'egg' },
-  'Verduras y hortalizas':{ emoji: '🥦', clase: 'cat-verduras',    icono: 'salad' },
-  'Legumbres y cereales': { emoji: '🌾', clase: 'cat-legumbres',   icono: 'wheat' },
-  'Conservas':            { emoji: '🥫', clase: 'cat-conservas',   icono: 'package' },
-  'Condimentos y aceites':{ emoji: '🫙', clase: 'cat-condimentos', icono: 'flask-conical' },
-  'Congelados':           { emoji: '❄️', clase: 'cat-congelados',  icono: 'thermometer-snowflake' },
-  'Otros':                { emoji: '🛒', clase: 'cat-otros',       icono: 'shopping-bag' }
-};
-
-// Orden de presentación de las categorías
-const ORDEN_CATEGORIAS = [
-  'Carnes y pescados',
-  'Lácteos y huevos',
-  'Verduras y hortalizas',
-  'Legumbres y cereales',
-  'Conservas',
-  'Condimentos y aceites',
-  'Congelados',
-  'Otros'
-];
-
-// Estado local
-let ingEditando       = null; // null = nuevo
-let textoBusquedaIng  = '';
-let ordenAscendente   = true;
+let segmentoCompra = getPref('segmentoCompra', 'rapida');
+let consultaFija = '';
+let recienAnadidos = new Set();
+let tRenderRapida = null;
 
 /* -------------------------------------------------------
-   Renderizado principal de la lista de la compra
+   Eventos de los controles fijos de la vista
 ------------------------------------------------------- */
-function renderizarCompra() {
-  renderizarResumen();
-  renderizarListaCompra();
-}
+function configurarCompra() {
+  const form = document.getElementById('formRapida');
+  const entrada = document.getElementById('entradaRapida');
 
-/* -------------------------------------------------------
-   Chips de resumen estadístico
-------------------------------------------------------- */
-function renderizarResumen() {
-  const lista       = getCompra();
-  const total       = lista.length;
-  const comprados   = lista.filter(i => i.comprado).length;
-  const pendientes  = total - comprados;
-  const categorias  = new Set(lista.map(i => i.categoria)).size;
-
-  document.getElementById('compraResumen').innerHTML = `
-    <div class="resumen-stat">
-      <div class="resumen-stat-icon verde">
-        <i data-lucide="shopping-basket"></i>
-      </div>
-      <div class="resumen-stat-info">
-        <span class="resumen-stat-valor">${total}</span>
-        <span class="resumen-stat-label">Total ingredientes</span>
-      </div>
-    </div>
-    <div class="resumen-stat">
-      <div class="resumen-stat-icon naranja">
-        <i data-lucide="circle-dot"></i>
-      </div>
-      <div class="resumen-stat-info">
-        <span class="resumen-stat-valor">${pendientes}</span>
-        <span class="resumen-stat-label">Pendientes</span>
-      </div>
-    </div>
-    <div class="resumen-stat">
-      <div class="resumen-stat-icon verde">
-        <i data-lucide="check-circle-2"></i>
-      </div>
-      <div class="resumen-stat-info">
-        <span class="resumen-stat-valor">${comprados}</span>
-        <span class="resumen-stat-label">Comprados</span>
-      </div>
-    </div>
-    <div class="resumen-stat">
-      <div class="resumen-stat-icon morado">
-        <i data-lucide="layers"></i>
-      </div>
-      <div class="resumen-stat-info">
-        <span class="resumen-stat-valor">${categorias}</span>
-        <span class="resumen-stat-label">Categorías</span>
-      </div>
-    </div>
-  `;
-  lucide.createIcons();
-}
-
-/* -------------------------------------------------------
-   Lista de ingredientes agrupada por categoría
-------------------------------------------------------- */
-function renderizarListaCompra() {
-  const container = document.getElementById('compraContainer');
-  let lista = getCompra();
-
-  // Aplicar filtro de texto
-  if (textoBusquedaIng.trim()) {
-    const t = textoBusquedaIng.toLowerCase();
-    lista = lista.filter(i =>
-      i.nombre.toLowerCase().includes(t) ||
-      (i.cantidad || '').toLowerCase().includes(t) ||
-      (i.notas || '').toLowerCase().includes(t)
-    );
-  }
-
-  // Aplicar orden
-  lista = lista.slice().sort((a, b) => {
-    const cmp = a.nombre.localeCompare(b.nombre, 'es');
-    return ordenAscendente ? cmp : -cmp;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!entrada.value.trim()) {
+      entrada.focus();
+      return;
+    }
+    anadirARapida(entrada.value);
+    entrada.value = '';
+    entrada.focus();
   });
 
-  if (lista.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">
-          <i data-lucide="shopping-cart"></i>
+  const buscar = document.getElementById('buscarFija');
+  buscar.addEventListener('input', debounce(() => {
+    consultaFija = buscar.value;
+    renderizarListaFija();
+  }, 120));
+}
+
+/* -------------------------------------------------------
+   Renderizado general
+------------------------------------------------------- */
+function renderizarCompra() {
+  const rapida = getRapida();
+  const fija = getCompra();
+  const pendientesRapida = rapida.filter(i => !i.comprado).length;
+  const pendientesFija = fija.filter(i => !i.comprado).length;
+
+  document.getElementById('numRapida').textContent = pendientesRapida || '';
+  document.getElementById('numFija').textContent = fija.length ? pendientesFija : '';
+
+  const enRapida = segmentoCompra === 'rapida';
+  document.getElementById('pestanaRapida').setAttribute('aria-selected', enRapida);
+  document.getElementById('pestanaFija').setAttribute('aria-selected', !enRapida);
+  document.getElementById('panelRapida').hidden = !enRapida;
+  document.getElementById('panelFija').hidden = enRapida;
+
+  document.getElementById('compraAntetitulo').textContent = enRapida
+    ? (pendientesRapida ? `${plural(pendientesRapida, 'cosa')} por comprar` : 'Lista rápida')
+    : (fija.length ? plural(fija.length, 'producto') : 'Lista fija');
+
+  if (enRapida) renderizarListaRapida();
+  else renderizarListaFija();
+}
+
+function agruparPorCategoria(items) {
+  const grupos = new Map(CATEGORIAS.map(c => [c.id, []]));
+  items.forEach(i => {
+    const cat = grupos.has(i.categoria) ? i.categoria : 'Otros';
+    grupos.get(cat).push(i);
+  });
+  return [...grupos.entries()].filter(([, lista]) => lista.length);
+}
+
+function htmlProgreso(hechos, total, texto) {
+  if (!total) return '';
+  return `
+    <div class="progreso">
+      <span>${texto}</span>
+      <div class="progreso-barra"><span style="width:${(hechos / total * 100).toFixed(1)}%"></span></div>
+    </div>
+  `;
+}
+
+function htmlCabeceraGrupo(catId, cuenta, plegable = false) {
+  const cat = infoCategoria(catId);
+  const contenido = `
+    <span class="grupo-marca" style="--color-cat:${cat.color}"></span>
+    <span>${esc(cat.nombre)}</span>
+    <span class="grupo-cuenta">${cuenta}</span>
+    ${plegable ? ico('chevron_abajo') : ''}
+  `;
+  return plegable
+    ? `<button class="grupo-cabecera" data-accion="plegarGrupo" data-cat="${esc(catId)}" aria-expanded="true">${contenido}</button>`
+    : `<div class="grupo-cabecera">${contenido}</div>`;
+}
+
+/* =========================================================
+   LISTA RÁPIDA
+   ========================================================= */
+function renderizarListaRapida() {
+  clearTimeout(tRenderRapida);
+  const cont = document.getElementById('listaRapida');
+  const lista = getRapida();
+  const pendientes = lista.filter(i => !i.comprado);
+  const comprados = lista.filter(i => i.comprado);
+
+  renderizarSugerencias(pendientes);
+
+  if (!lista.length) {
+    cont.innerHTML = `
+      <div class="vacio-compacto">
+        <p><strong>La lista está vacía.</strong> Escribe arriba lo que haga falta y pulsa intro. Puedes poner varias cosas a la vez separadas por comas.</p>
+        ${getCompra().some(i => !i.comprado) ? `
+          <button class="boton boton-secundario boton-pequeno" data-accion="traerDeFija">${ico('fija')}Traer lo pendiente de la fija</button>` : ''}
+      </div>
+    `;
+    return;
+  }
+
+  cont.innerHTML = `
+    ${!pendientes.length ? `
+      <div class="compra-hecha">
+        ${ico('hecho')}
+        <h3>Lo tienes todo</h3>
+        <p>Vacía la lista y queda lista para la próxima vez.</p>
+        <button class="boton boton-primario" data-accion="vaciarRapida">${ico('vaciar')}Vaciar lista</button>
+      </div>
+    ` : htmlProgreso(comprados.length, lista.length, `${comprados.length} de ${lista.length} en el carro`)}
+
+    ${agruparPorCategoria(pendientes).map(([cat, items]) => `
+      <section class="grupo">
+        ${htmlCabeceraGrupo(cat, items.length)}
+        <div class="lista">${items.map(htmlFilaRapida).join('')}</div>
+      </section>
+    `).join('')}
+
+    ${comprados.length ? `
+      <section class="grupo carro">
+        <div class="grupo-cabecera">
+          <span>En el carro</span>
+          <span class="grupo-cuenta">${comprados.length}</span>
+          ${pendientes.length ? '<button class="boton-texto" data-accion="vaciarCompradosRapida" style="margin-left:8px">Quitar</button>' : ''}
         </div>
-        <h3>Tu lista de la compra está vacía</h3>
-        <p>Añade ingredientes con el botón "Añadir" o pulsa en "Cargar ejemplo" para ver la lista de prueba.</p>
-        <div class="header-btn-group" style="margin-top: 14px; justify-content: center;">
-          <button class="btn btn-outline btn-sm" onclick="cargarEjemplosCompletos()">
-            <i data-lucide="sparkles"></i>
-            Cargar lista de compra de ejemplo
-          </button>
+        <div class="lista">${comprados.map(htmlFilaRapida).join('')}</div>
+      </section>
+    ` : ''}
+  `;
+  recienAnadidos = new Set();
+}
+
+// "x6 · lo pidió Ana" / "cogido por Luis" (solo si lo hizo otra persona)
+function detalleProducto(i) {
+  const quien = i.comprado ? autorVisible(i.marcadoPor) : autorVisible(i.autor);
+  const partes = [
+    i.cantidad && esc(i.cantidad),
+    quien && `<span class="producto-autor">${i.comprado ? 'cogido por' : 'lo pidió'} ${esc(quien)}</span>`
+  ].filter(Boolean);
+  return partes.length ? `<span class="producto-cantidad">${partes.join(' · ')}</span>` : '';
+}
+
+function htmlFilaRapida(i) {
+  return `
+    <div class="producto ${i.comprado ? 'marcado' : ''} ${recienAnadidos.has(i.id) ? 'producto-entrando' : ''}" data-pulsacion-larga="editarRapida" data-id="${esc(i.id)}">
+      <button class="producto-marcar" data-accion="marcarRapida" data-id="${esc(i.id)}" aria-pressed="${!!i.comprado}">
+        <span class="casilla">${ico('check')}</span>
+        <span class="producto-texto">
+          <span class="producto-nombre">${esc(i.nombre)}</span>
+          ${detalleProducto(i)}
+        </span>
+      </button>
+      <button class="boton-icono pequeno" data-accion="quitarRapida" data-id="${esc(i.id)}" aria-label="Quitar ${esc(i.nombre)}">${ico('cerrar')}</button>
+    </div>
+  `;
+}
+
+/* -------------------------------------------------------
+   Sugerencias (lo que sueles comprar)
+------------------------------------------------------- */
+function renderizarSugerencias(pendientes) {
+  const enLista = new Set(pendientes.map(i => claveProducto(i.nombre)));
+  const historial = getHistorial()
+    .slice()
+    .sort((a, b) => puntuacionHistorial(b) - puntuacionHistorial(a));
+
+  const sugeridas = historial.filter(h => !enLista.has(h.id)).slice(0, 12);
+  const cont = document.getElementById('sugerenciasRapida');
+  cont.hidden = !sugeridas.length;
+  cont.innerHTML = sugeridas.map(h => `
+    <button class="chip sugerencia" data-accion="anadirSugerencia" data-nombre="${esc(h.nombre)}">${ico('mas')}${esc(h.nombre)}</button>
+  `).join('');
+
+  document.getElementById('productosConocidos').innerHTML = historial
+    .slice(0, 80)
+    .map(h => `<option value="${esc(h.nombre)}"></option>`)
+    .join('');
+}
+
+/* -------------------------------------------------------
+   Añadir a la lista rápida
+   Acepta "pan, leche, 2 kg naranjas" de una vez
+------------------------------------------------------- */
+function anadirARapida(texto) {
+  const entradas = dividirEntradas(texto).map(interpretarEntrada).filter(Boolean);
+  if (!entradas.length) return;
+
+  const r = anadirProductosARapida(entradas);
+  vibrar(6);
+  refrescarApp();
+
+  if (r.repetidos && r.repetidos === entradas.length) {
+    aviso(entradas.length === 1 ? 'Ya estaba en la lista' : 'Ya estaban en la lista', { duracion: 1600 });
+  }
+}
+
+/*
+  Añade productos [{ nombre, cantidad, categoria }] a la rápida.
+  Si ya estaban, vuelven a quedar pendientes en vez de duplicarse.
+*/
+function anadirProductosARapida(productos) {
+  const lista = getRapida().slice();
+  const anotados = [];
+  let nuevos = 0;
+  let repetidos = 0;
+
+  productos.forEach(p => {
+    const clave = claveProducto(p.nombre);
+    if (!clave) return;
+    const idx = lista.findIndex(i => claveProducto(i.nombre) === clave);
+    if (idx >= 0) {
+      const ex = lista[idx];
+      if (!ex.comprado && (!p.cantidad || p.cantidad === ex.cantidad)) repetidos++;
+      lista[idx] = { ...ex, comprado: false, marcadoPor: '', cantidad: p.cantidad || ex.cantidad || '' };
+      anotados.push(lista[idx]);
+      return;
+    }
+    const item = {
+      id: generarId('r'),
+      nombre: capitalizar(p.nombre),
+      cantidad: p.cantidad || '',
+      categoria: p.categoria || adivinarCategoria(p.nombre),
+      comprado: false,
+      autor: getYo().id,
+      creadoEn: Date.now()
+    };
+    lista.push(item);
+    anotados.push(item);
+    recienAnadidos.add(item.id);
+    nuevos++;
+  });
+
+  actualizarFamiliaActiva({ rapida: lista, historial: anotarEnHistorial(anotados) });
+  return { nuevos, repetidos };
+}
+
+// Marca o desmarca y apunta quién lo ha cogido
+function alternarComprado(i) {
+  return i.comprado
+    ? { ...i, comprado: false, marcadoPor: '' }
+    : { ...i, comprado: true, marcadoPor: getYo().id };
+}
+
+function marcarRapida(id, el) {
+  const lista = getRapida().map(i => (i.id === id ? alternarComprado(i) : i));
+  const item = lista.find(i => i.id === id);
+  if (!item) return;
+  setColeccion('rapida', lista);
+  vibrar(item.comprado ? 10 : 5);
+
+  // Marcar al instante y recolocar un momento después (si no, el producto "salta")
+  const fila = el.closest('.producto');
+  fila.classList.toggle('marcado', item.comprado);
+  el.setAttribute('aria-pressed', item.comprado);
+  actualizarInsigniaCompra();
+
+  clearTimeout(tRenderRapida);
+  tRenderRapida = setTimeout(renderizarCompra, item.comprado ? 650 : 250);
+}
+
+function quitarRapida(id) {
+  const item = getRapida().find(i => i.id === id);
+  if (!item) return;
+  const deshacer = quitarDeColeccion('rapida', id);
+  renderizarCompra();
+  actualizarInsigniaCompra();
+  aviso(`${item.nombre} quitado`, {
+    accion: { texto: 'Deshacer', fn: () => { deshacer(); refrescarApp(); } }
+  });
+}
+
+// Quita varios elementos de una lista dejando la opción de deshacer
+function quitarVarios(coleccion, filtro, mensaje) {
+  const lista = getColeccion(coleccion);
+  const quitados = lista.map((item, idx) => ({ item, idx })).filter(({ item }) => filtro(item));
+  if (!quitados.length) return;
+
+  setColeccion(coleccion, lista.filter(i => !filtro(i)));
+  refrescarApp();
+  aviso(mensaje(quitados.length), {
+    accion: {
+      texto: 'Deshacer',
+      fn: () => {
+        restaurarEnColeccion(coleccion, quitados);
+        refrescarApp();
+      }
+    }
+  });
+}
+
+/* -------------------------------------------------------
+   Editar un producto de la lista rápida (pulsación larga)
+------------------------------------------------------- */
+function abrirEditarRapida(id) {
+  const item = getRapida().find(i => i.id === id);
+  if (!item) return;
+
+  Hoja.abrir({
+    titulo: 'Editar producto',
+    cuerpo: `
+      <form id="formEditarRapida" novalidate>
+        <div class="fila-campos">
+          <label class="campo">
+            <span class="campo-etiqueta">Producto</span>
+            <input class="entrada" name="nombre" required value="${esc(item.nombre)}" autocapitalize="sentences" />
+          </label>
+          <label class="campo">
+            <span class="campo-etiqueta">Cantidad</span>
+            <input class="entrada" name="cantidad" value="${esc(item.cantidad || '')}" placeholder="Opcional" />
+          </label>
+        </div>
+        <label class="campo">
+          <span class="campo-etiqueta">Sección del súper</span>
+          ${htmlSelectorCategoria(item.categoria)}
+        </label>
+        <div class="grupo-botones">
+          <button type="button" class="boton boton-secundario boton-pequeno" data-x="aFija">${ico('fija')}Guardar también en la fija</button>
+        </div>
+      </form>
+    `,
+    pie: `
+      <button type="button" class="boton boton-secundario" data-cerrar-hoja>Cancelar</button>
+      <button type="submit" form="formEditarRapida" class="boton boton-primario">Guardar</button>
+    `,
+    alAbrir: (d) => {
+      const form = d.querySelector('form');
+      d.querySelector('[data-x="aFija"]').addEventListener('click', async () => {
+        await Hoja.cerrar(d);
+        const v = valoresFormulario(form);
+        anadirAFija([{ nombre: v.nombre || item.nombre, cantidad: v.cantidad, categoria: v.categoria }]);
+        aviso('Guardado en la lista fija');
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = valoresFormulario(form);
+        if (!v.nombre) return form.nombre.focus();
+        const editado = { ...item, nombre: capitalizar(v.nombre), cantidad: v.cantidad, categoria: v.categoria };
+        const lista = getRapida().map(i => (i.id === id ? editado : i));
+        // Recordar la sección elegida para la próxima vez
+        actualizarFamiliaActiva({ rapida: lista, historial: anotarEnHistorial([editado]) });
+        Hoja.cerrar(d);
+        refrescarApp();
+      });
+    }
+  });
+}
+
+function htmlSelectorCategoria(seleccionada) {
+  return `
+    <select class="entrada" name="categoria">
+      ${CATEGORIAS.map(c => `<option value="${esc(c.id)}" ${c.id === seleccionada ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}
+    </select>
+  `;
+}
+
+/* =========================================================
+   LISTA FIJA
+   ========================================================= */
+function renderizarListaFija() {
+  const cont = document.getElementById('listaFija');
+  const todos = getCompra();
+  const plegados = new Set(getPref('fijaPlegados', []));
+  document.querySelector('#panelFija .herramientas').hidden = todos.length < 8;
+
+  if (!todos.length) {
+    cont.innerHTML = `
+      <div class="vacio-compacto">
+        <p><strong>La lista fija está vacía.</strong> Añade lo que compras siempre, con la cantidad y notas como cómo congelarlo o dividirlo.</p>
+        <div class="grupo-botones">
+          <button class="boton boton-primario boton-pequeno" data-accion="nuevoFija">${ico('mas')}Añadir producto</button>
+          <button class="boton boton-secundario boton-pequeno" data-accion="cargarEjemplos">Ver un ejemplo</button>
         </div>
       </div>
     `;
-    lucide.createIcons();
     return;
   }
 
-  // Agrupar por categoría
-  const porCategoria = {};
-  lista.forEach(i => {
-    const cat = i.categoria || 'Otros';
-    if (!porCategoria[cat]) porCategoria[cat] = [];
-    porCategoria[cat].push(i);
+  const items = todos
+    .filter(i => coincideBusqueda([i.nombre, i.cantidad, i.notas], consultaFija))
+    .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+  const marcados = todos.filter(i => i.comprado).length;
+
+  if (!items.length) {
+    cont.innerHTML = `<div class="vacio-compacto"><p>Nada coincide con «${esc(consultaFija)}».</p></div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    ${marcados ? `
+      <div class="progreso">
+        <span>${marcados} de ${todos.length} marcados</span>
+        <div class="progreso-barra"><span style="width:${(marcados / todos.length * 100).toFixed(1)}%"></span></div>
+        <button class="boton-texto" data-accion="desmarcarFija">Desmarcar</button>
+      </div>` : ''}
+
+    ${agruparPorCategoria(items).map(([cat, lista]) => {
+      const hechos = lista.filter(i => i.comprado).length;
+      const plegado = plegados.has(cat) && !consultaFija;
+      return `
+        <section class="grupo ${plegado ? 'plegado' : ''}">
+          ${htmlCabeceraGrupo(cat, `${hechos}/${lista.length}`, true).replace('aria-expanded="true"', `aria-expanded="${!plegado}"`)}
+          <div class="lista">${lista.map(htmlFilaFija).join('')}</div>
+        </section>
+      `;
+    }).join('')}
+  `;
+}
+
+function htmlFilaFija(i) {
+  return `
+    <div class="producto ${i.comprado ? 'marcado' : ''} ${recienAnadidos.has(i.id) ? 'producto-entrando' : ''}" data-pulsacion-larga="editarFija" data-id="${esc(i.id)}">
+      <button class="producto-marcar" data-accion="marcarFija" data-id="${esc(i.id)}" aria-pressed="${!!i.comprado}">
+        <span class="casilla">${ico('check')}</span>
+        <span class="producto-texto">
+          <span class="producto-nombre">${esc(i.nombre)}</span>
+          ${detalleProducto(i)}
+          ${i.notas ? `<span class="producto-nota">${ico('nota')}${esc(i.notas)}</span>` : ''}
+        </span>
+      </button>
+      <button class="boton-icono pequeno" data-accion="editarFija" data-id="${esc(i.id)}" aria-label="Editar ${esc(i.nombre)}">${ico('editar')}</button>
+    </div>
+  `;
+}
+
+function marcarFija(id, el) {
+  const lista = getCompra().map(i => (i.id === id ? alternarComprado(i) : i));
+  const item = lista.find(i => i.id === id);
+  if (!item) return;
+  setColeccion('compra', lista);
+  vibrar(item.comprado ? 10 : 5);
+  el.closest('.producto').classList.toggle('marcado', item.comprado);
+  el.setAttribute('aria-pressed', item.comprado);
+
+  clearTimeout(tRenderRapida);
+  tRenderRapida = setTimeout(renderizarCompra, 250);
+}
+
+// Añade productos a la fija; si ya existen, los deja sin marcar
+function anadirAFija(productos) {
+  const lista = getCompra().slice();
+  let nuevos = 0;
+  productos.forEach(p => {
+    const clave = claveProducto(p.nombre);
+    const idx = lista.findIndex(i => claveProducto(i.nombre) === clave);
+    if (idx >= 0) {
+      lista[idx] = { ...lista[idx], comprado: false, marcadoPor: '', cantidad: lista[idx].cantidad || p.cantidad || '' };
+    } else {
+      const item = {
+        id: generarId('ing'),
+        nombre: capitalizar(p.nombre),
+        cantidad: p.cantidad || '',
+        categoria: p.categoria || adivinarCategoria(p.nombre),
+        notas: p.notas || '',
+        comprado: false,
+        autor: getYo().id
+      };
+      lista.push(item);
+      recienAnadidos.add(item.id);
+      nuevos++;
+    }
+  });
+  setColeccion('compra', lista);
+  return nuevos;
+}
+
+/* -------------------------------------------------------
+   Formulario de la lista fija (nuevo / editar)
+------------------------------------------------------- */
+function abrirFormFija(id = null) {
+  const item = id ? getIngredientePorId(id) : null;
+
+  Hoja.abrir({
+    titulo: item ? 'Editar producto' : 'Añadir a la lista fija',
+    cuerpo: `
+      <form id="formFija" novalidate>
+        <label class="campo">
+          <span class="campo-etiqueta">Producto</span>
+          <input class="entrada" name="nombre" required maxlength="100" value="${esc(item?.nombre || '')}" placeholder="Ej.: Pechuga de pollo" ${item ? '' : 'autofocus'} autocapitalize="sentences" />
+        </label>
+        <div class="fila-campos">
+          <label class="campo">
+            <span class="campo-etiqueta">Cantidad</span>
+            <input class="entrada" name="cantidad" value="${esc(item?.cantidad || '')}" placeholder="Ej.: 500 g" />
+          </label>
+          <label class="campo">
+            <span class="campo-etiqueta">Sección</span>
+            ${htmlSelectorCategoria(item?.categoria || 'Otros')}
+          </label>
+        </div>
+        <label class="campo">
+          <span class="campo-etiqueta">Notas</span>
+          <textarea class="entrada" name="notas" rows="3" placeholder="Cómo dividirlo, congelarlo, marca preferida…">${esc(item?.notas || '')}</textarea>
+        </label>
+        ${item ? `
+          <div class="grupo-botones">
+            <button type="button" class="boton boton-secundario boton-pequeno" data-x="aRapida">${ico('rayo')}Añadir a la rápida</button>
+            <button type="button" class="boton boton-secundario boton-pequeno peligro" data-x="eliminar">${ico('papelera')}Eliminar</button>
+          </div>` : ''}
+      </form>
+    `,
+    pie: `
+      <button type="button" class="boton boton-secundario" data-cerrar-hoja>Cancelar</button>
+      <button type="submit" form="formFija" class="boton boton-primario">${item ? 'Guardar' : 'Añadir'}</button>
+    `,
+    alAbrir: (d) => {
+      const form = d.querySelector('form');
+      const selCat = form.categoria;
+      let catTocada = !!item;
+      selCat.addEventListener('change', () => { catTocada = true; });
+      form.nombre.addEventListener('input', debounce(() => {
+        if (!catTocada && form.nombre.value.trim()) selCat.value = adivinarCategoria(form.nombre.value);
+      }, 250));
+
+      d.querySelector('[data-x="aRapida"]')?.addEventListener('click', async () => {
+        await Hoja.cerrar(d);
+        anadirProductosARapida([{ nombre: item.nombre, cantidad: item.cantidad, categoria: item.categoria }]);
+        refrescarApp();
+        aviso(`${item.nombre} en la lista rápida`);
+      });
+      d.querySelector('[data-x="eliminar"]')?.addEventListener('click', async () => {
+        await Hoja.cerrar(d);
+        const deshacer = quitarDeColeccion('compra', item.id);
+        refrescarApp();
+        aviso(`${item.nombre} eliminado de la fija`, { accion: { texto: 'Deshacer', fn: () => { deshacer(); refrescarApp(); } } });
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = valoresFormulario(form);
+        if (!v.nombre) {
+          form.nombre.focus();
+          aviso('Escribe el nombre del producto', { tipo: 'error' });
+          return;
+        }
+        const nuevo = {
+          id: item ? item.id : generarId('ing'),
+          nombre: capitalizar(v.nombre),
+          cantidad: v.cantidad,
+          categoria: v.categoria,
+          notas: v.notas,
+          comprado: item ? !!item.comprado : false,
+          marcadoPor: item ? (item.marcadoPor || '') : '',
+          autor: item ? (item.autor || '') : getYo().id
+        };
+        if (!item) recienAnadidos.add(nuevo.id);
+        guardarIngredienteStorage(nuevo);
+        Hoja.cerrar(d);
+        refrescarApp();
+        aviso(item ? 'Producto guardado' : `${nuevo.nombre} añadido a la fija`);
+      });
+    }
+  });
+}
+
+/* =========================================================
+   AÑADIR INGREDIENTES (de dietas o recetas) A LA COMPRA
+   ========================================================= */
+function abrirAnadirACompra({ titulo, entradas }) {
+  const productos = agregarIngredientes(entradas || []);
+  if (!productos.length) {
+    aviso('No hay ingredientes que añadir');
+    return;
+  }
+  let destino = getPref('destinoCompra', 'rapida');
+
+  const yaEn = (dest) => new Set((dest === 'rapida' ? getRapida().filter(i => !i.comprado) : getCompra())
+    .map(i => claveProducto(i.nombre)));
+
+  const filas = () => {
+    const existentes = yaEn(destino);
+    return productos.map((p, i) => {
+      const ya = existentes.has(p.clave);
+      return `
+        <label class="fila previa-fila ${ya ? '' : 'marcado'}">
+          <input type="checkbox" name="p" value="${i}" ${ya ? '' : 'checked'} />
+          <span class="casilla">${ico('check')}</span>
+          <span class="fila-texto">
+            <span class="fila-titulo" style="font-weight:550">${esc(p.nombre)}</span>
+            <span class="fila-detalle">${esc([p.cantidad, infoCategoria(p.categoria).nombre].filter(Boolean).join(' · '))}</span>
+          </span>
+          ${ya ? '<span class="ya">Ya está</span>' : ''}
+        </label>
+      `;
+    }).join('');
+  };
+
+  const d = Hoja.abrir({
+    titulo: 'Añadir a la compra',
+    subtitulo: titulo,
+    cuerpo: `
+      <div class="campo">
+        ${htmlSegmentado('destino', [{ valor: 'rapida', texto: 'Lista rápida' }, { valor: 'fija', texto: 'Lista fija' }], destino)}
+      </div>
+      <p class="campo-ayuda" style="margin-bottom:10px">Se han juntado los ingredientes repetidos. Desmarca lo que ya tengas en casa.</p>
+      <div class="lista" data-x="filas">${filas()}</div>
+    `,
+    pie: `
+      <button type="button" class="boton boton-secundario" data-cerrar-hoja>Cancelar</button>
+      <button type="button" class="boton boton-primario" data-x="ok"></button>
+    `
   });
 
-  const html = ORDEN_CATEGORIAS
-    .filter(cat => porCategoria[cat] && porCategoria[cat].length > 0)
-    .map(cat => renderizarCategoriaGrupo(cat, porCategoria[cat]))
-    .join('');
+  const cont = d.querySelector('[data-x="filas"]');
+  const ok = d.querySelector('[data-x="ok"]');
+  const actualizarBoton = () => {
+    const n = cont.querySelectorAll('input:checked').length;
+    ok.textContent = n ? `Añadir ${n}` : 'Nada que añadir';
+    ok.disabled = !n;
+  };
+  actualizarBoton();
 
-  container.innerHTML = html;
-  lucide.createIcons();
+  // Las filas son <label>: el estilo de "marcado" sigue a su casilla
+  cont.addEventListener('change', (e) => {
+    e.target.closest('.previa-fila').classList.toggle('marcado', e.target.checked);
+    actualizarBoton();
+  });
+
+  d.querySelectorAll('input[name="destino"]').forEach(r => r.addEventListener('change', () => {
+    destino = r.value;
+    setPref('destinoCompra', destino);
+    cont.innerHTML = filas();
+    actualizarBoton();
+  }));
+
+  ok.addEventListener('click', async () => {
+    const elegidos = [...cont.querySelectorAll('input:checked')].map(c => productos[Number(c.value)]);
+    await Hoja.cerrar(d);
+
+    if (destino === 'rapida') {
+      anadirProductosARapida(elegidos);
+    } else {
+      anadirAFija(elegidos);
+    }
+
+    refrescarApp();
+    aviso(`${plural(elegidos.length, 'producto')} en la lista ${destino === 'rapida' ? 'rápida' : 'fija'}`, {
+      accion: vistaActual === 'compra' && segmentoCompra === destino ? null : {
+        texto: 'Ver',
+        fn: () => {
+          segmentoCompra = destino;
+          setPref('segmentoCompra', destino);
+          irAVista('compra');
+        }
+      }
+    });
+  });
 }
 
-/* -------------------------------------------------------
-   HTML de un grupo de categoría
-------------------------------------------------------- */
-function renderizarCategoriaGrupo(categoria, ingredientes) {
-  const conf       = CATEGORIAS_CONFIG[categoria] || CATEGORIAS_CONFIG['Otros'];
-  const comprados  = ingredientes.filter(i => i.comprado).length;
-  const total      = ingredientes.length;
-  const pct        = total > 0 ? Math.round((comprados / total) * 100) : 0;
-  const catId      = categoria.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-
-  return `
-    <div class="categoria-grupo abierta" id="catGrupo_${catId}">
-      <div class="categoria-header" onclick="toggleCategoria('${catId}')">
-        <div class="categoria-icono ${conf.clase}">
-          <i data-lucide="${conf.icono}"></i>
-        </div>
-        <span class="categoria-nombre">${categoria}</span>
-        <div class="categoria-contador">
-          <span>${comprados}/${total}</span>
-          <div class="categoria-progreso-bar">
-            <div class="categoria-progreso-fill" style="width:${pct}%"></div>
-          </div>
-        </div>
-        <i data-lucide="chevron-down" class="categoria-chevron"></i>
-      </div>
-      <div class="categoria-lista">
-        ${ingredientes.map(i => renderizarIngFila(i)).join('')}
-      </div>
-    </div>
-  `;
+/* =========================================================
+   MENÚ Y TEXTO PARA COMPARTIR
+   ========================================================= */
+function textoLista(items, titulo) {
+  const lineas = [titulo];
+  agruparPorCategoria(items).forEach(([cat, lista]) => {
+    lineas.push('', infoCategoria(cat).nombre);
+    lista.forEach(i => lineas.push(`• ${i.nombre}${i.cantidad ? ` (${i.cantidad})` : ''}`));
+  });
+  return lineas.join('\n');
 }
 
-/* -------------------------------------------------------
-   HTML de una fila de ingrediente
-------------------------------------------------------- */
-function renderizarIngFila(ing) {
-  const tieneNotas = ing.notas && ing.notas.trim().length > 0;
-
-  return `
-    <div class="ing-fila ${ing.comprado ? 'comprado' : ''}" id="ingFila_${ing.id}">
-      <label class="ing-checkbox">
-        <input type="checkbox"
-          ${ing.comprado ? 'checked' : ''}
-          onchange="marcarComprado('${ing.id}', this)" />
-        <div class="ing-checkbox-custom">
-          <i data-lucide="check"></i>
-        </div>
-      </label>
-      <div class="ing-info">
-        <div class="ing-nombre">${escapeHtml(ing.nombre)}</div>
-        ${ing.cantidad ? `<div class="ing-cantidad">${escapeHtml(ing.cantidad)}</div>` : ''}
-      </div>
-      ${tieneNotas ? `
-        <button class="ing-nota-toggle" title="Ver notas" onclick="toggleNotasIng('${ing.id}')">
-          <i data-lucide="info"></i>
-        </button>
-      ` : '<div style="width:30px"></div>'}
-      <div class="ing-acciones">
-        <button class="btn-icon" title="Editar" onclick="abrirModalEditarIngrediente('${ing.id}')">
-          <i data-lucide="pencil"></i>
-        </button>
-        <button class="btn-icon danger" title="Eliminar" onclick="confirmarEliminarIngrediente('${ing.id}', '${escapeHtml(ing.nombre)}')">
-          <i data-lucide="trash-2"></i>
-        </button>
-      </div>
-    </div>
-    ${tieneNotas ? `
-      <div class="ing-notas-panel" id="notas_${ing.id}">
-        <i data-lucide="info" style="width:14px;height:14px;flex-shrink:0;display:inline-block;vertical-align:middle;margin-right:6px;color:var(--color-primary)"></i>
-        ${escapeHtml(ing.notas)}
-      </div>
-    ` : ''}
-  `;
-}
-
-/* -------------------------------------------------------
-   Toggle categoría
-------------------------------------------------------- */
-function toggleCategoria(catId) {
-  const el = document.getElementById(`catGrupo_${catId}`);
-  if (el) el.classList.toggle('abierta');
-}
-
-/* -------------------------------------------------------
-   Toggle notas de un ingrediente
-------------------------------------------------------- */
-function toggleNotasIng(id) {
-  const panel = document.getElementById(`notas_${id}`);
-  if (panel) panel.classList.toggle('visible');
-}
-
-/* -------------------------------------------------------
-   Marcar/desmarcar ingrediente como comprado
-------------------------------------------------------- */
-function marcarComprado(id, checkbox) {
-  const comprado = toggleCompradoStorage(id);
-  const fila = document.getElementById(`ingFila_${id}`);
-  if (fila) {
-    fila.classList.toggle('comprado', comprado);
+async function compartirTexto(titulo, texto) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: titulo, text: texto });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
   }
-  // Actualizar resumen sin re-renderizar toda la lista
-  renderizarResumen();
-  // Re-renderizar categoría para actualizar barra de progreso
-  renderizarListaCompra();
+  try {
+    await navigator.clipboard.writeText(texto);
+    aviso('Lista copiada. Pégala donde quieras.');
+  } catch (e) {
+    aviso('No se ha podido copiar la lista', { tipo: 'error' });
+  }
 }
 
-/* -------------------------------------------------------
-   Limpiar todos los marcados
-------------------------------------------------------- */
-function limpiarComprados() {
-  limpiarCompradosStorage();
-  renderizarCompra();
-  mostrarToast('Lista reiniciada', 'success');
-}
+function menuCompra() {
+  if (segmentoCompra === 'rapida') {
+    const lista = getRapida();
+    const pendientes = lista.filter(i => !i.comprado);
+    const comprados = lista.length - pendientes.length;
+    const fijaPendiente = getCompra().filter(i => !i.comprado).length;
 
-/* -------------------------------------------------------
-   Ordenar lista
-------------------------------------------------------- */
-function ordenarCompra() {
-  ordenAscendente = !ordenAscendente;
-  renderizarListaCompra();
-}
+    const acciones = [
+      pendientes.length && {
+        icono: 'compartir', texto: 'Enviar la lista', detalle: 'Por WhatsApp, mensaje o donde quieras',
+        fn: () => compartirTexto('Lista de la compra', textoLista(pendientes, 'Lista de la compra'))
+      },
+      fijaPendiente && {
+        icono: 'fija', texto: 'Traer lo pendiente de la fija', detalle: `${plural(fijaPendiente, 'producto')} sin marcar`,
+        fn: () => traerDeFija()
+      },
+      comprados && { icono: 'check', texto: 'Quitar lo comprado', detalle: plural(comprados, 'producto'), fn: () => ACCIONES.vaciarCompradosRapida() },
+      lista.length && { icono: 'vaciar', texto: 'Vaciar la lista', peligro: true, fn: () => ACCIONES.vaciarRapida() }
+    ].filter(Boolean);
 
-/* -------------------------------------------------------
-   Filtrar ingredientes por texto
-------------------------------------------------------- */
-function filtrarIngredientes() {
-  textoBusquedaIng = document.getElementById('buscarIngrediente').value;
-  renderizarListaCompra();
-}
-
-/* -------------------------------------------------------
-   Modal: nuevo ingrediente
-------------------------------------------------------- */
-function abrirModalNuevoIngrediente() {
-  ingEditando = null;
-  document.getElementById('modalIngTitulo').textContent = 'Añadir ingrediente';
-  document.getElementById('ingNombre').value    = '';
-  document.getElementById('ingCantidad').value  = '';
-  document.getElementById('ingCategoria').value = 'Carnes y pescados';
-  document.getElementById('ingNotas').value     = '';
-  abrirModal('modalIngrediente');
-}
-
-/* -------------------------------------------------------
-   Modal: editar ingrediente existente
-------------------------------------------------------- */
-function abrirModalEditarIngrediente(id) {
-  const ing = getIngredientePorId(id);
-  if (!ing) return;
-
-  ingEditando = id;
-  document.getElementById('modalIngTitulo').textContent = 'Editar ingrediente';
-  document.getElementById('ingNombre').value    = ing.nombre;
-  document.getElementById('ingCantidad').value  = ing.cantidad || '';
-  document.getElementById('ingCategoria').value = ing.categoria || 'Otros';
-  document.getElementById('ingNotas').value     = ing.notas || '';
-  abrirModal('modalIngrediente');
-}
-
-/* -------------------------------------------------------
-   Guardar ingrediente (nuevo o editado)
-------------------------------------------------------- */
-function guardarIngrediente(e) {
-  e.preventDefault();
-
-  const nombre    = document.getElementById('ingNombre').value.trim();
-  const cantidad  = document.getElementById('ingCantidad').value.trim();
-  const categoria = document.getElementById('ingCategoria').value;
-  const notas     = document.getElementById('ingNotas').value.trim();
-
-  if (!nombre) {
-    mostrarToast('El nombre es obligatorio', 'error');
+    menuAcciones({
+      titulo: 'Lista rápida',
+      acciones: acciones.length ? acciones : [{
+        icono: 'mas', texto: 'La lista está vacía', detalle: 'Escribe arriba para añadir',
+        fn: () => document.getElementById('entradaRapida').focus()
+      }]
+    });
     return;
   }
 
-  const ing = {
-    id:        ingEditando || generarId('ing'),
-    nombre,
-    cantidad,
-    categoria,
-    notas,
-    comprado:  ingEditando ? (getIngredientePorId(ingEditando)?.comprado || false) : false
-  };
+  const fija = getCompra();
+  const marcados = fija.filter(i => i.comprado).length;
+  const pendientes = fija.filter(i => !i.comprado);
+  menuAcciones({
+    titulo: 'Lista fija',
+    acciones: [
+      { icono: 'mas', texto: 'Añadir producto', fn: () => abrirFormFija() },
+      marcados && { icono: 'desmarcar', texto: 'Desmarcar todo', detalle: 'Para empezar la próxima compra', fn: () => ACCIONES.desmarcarFija() },
+      pendientes.length && {
+        icono: 'rayo', texto: 'Pasar lo no marcado a la rápida', detalle: plural(pendientes.length, 'producto'),
+        fn: () => {
+          segmentoCompra = 'rapida';
+          setPref('segmentoCompra', 'rapida');
+          actualizarFab();
+          traerDeFija();
+        }
+      },
+      fija.length && {
+        icono: 'compartir', texto: 'Enviar la lista fija',
+        fn: () => compartirTexto('Lista fija', textoLista(pendientes.length ? pendientes : fija, 'Lista de la compra'))
+      }
+    ]
+  });
+}
 
-  guardarIngredienteStorage(ing);
-  cerrarModal('modalIngrediente');
-  renderizarCompra();
-  mostrarToast(ingEditando ? 'Ingrediente actualizado' : 'Ingrediente añadido', 'success');
+function traerDeFija() {
+  const yaPendientes = new Set(getRapida().filter(i => !i.comprado).map(i => claveProducto(i.nombre)));
+  const faltan = getCompra().filter(i => !i.comprado && !yaPendientes.has(claveProducto(i.nombre)));
+  if (!faltan.length) {
+    aviso('Ya estaba todo en la rápida');
+    return;
+  }
+  anadirProductosARapida(faltan.map(i => ({ nombre: i.nombre, cantidad: i.cantidad, categoria: i.categoria })));
+  refrescarApp();
+  aviso(`${plural(faltan.length, 'producto')} traído${faltan.length === 1 ? '' : 's'} de la fija`);
+}
+
+function actualizarInsigniaCompra() {
+  const n = getRapida().filter(i => !i.comprado).length;
+  const insignia = document.getElementById('insigniaCompra');
+  insignia.hidden = !n;
+  insignia.textContent = n > 99 ? '99+' : n;
 }
 
 /* -------------------------------------------------------
-   Confirmar y eliminar ingrediente
+   Acciones registradas
 ------------------------------------------------------- */
-function confirmarEliminarIngrediente(id, nombre) {
-  document.getElementById('confirmarTexto').textContent =
-    `¿Seguro que quieres eliminar "${nombre}" de la lista?`;
-
-  document.getElementById('confirmarBtn').onclick = () => {
-    eliminarIngredienteStorage(id);
-    cerrarModal('modalConfirmar');
+registrarAcciones({
+  segmentoCompra: (el) => {
+    segmentoCompra = el.dataset.segmento;
+    setPref('segmentoCompra', segmentoCompra);
+    actualizarFab();
     renderizarCompra();
-    mostrarToast('Ingrediente eliminado', 'success');
-  };
-
-  abrirModal('modalConfirmar');
-}
+  },
+  menuCompra: () => menuCompra(),
+  marcarRapida: (el) => marcarRapida(el.dataset.id, el),
+  quitarRapida: (el) => quitarRapida(el.dataset.id),
+  editarRapida: (el) => abrirEditarRapida(el.dataset.id),
+  anadirSugerencia: (el) => anadirARapida(el.dataset.nombre),
+  traerDeFija: () => traerDeFija(),
+  vaciarRapida: () => quitarVarios('rapida', () => true, n => `Lista vaciada (${plural(n, 'producto')})`),
+  vaciarCompradosRapida: () => quitarVarios('rapida', i => i.comprado, n => `${plural(n, 'producto')} fuera de la lista`),
+  marcarFija: (el) => marcarFija(el.dataset.id, el),
+  editarFija: (el) => abrirFormFija(el.dataset.id),
+  nuevoFija: () => abrirFormFija(),
+  desmarcarFija: () => {
+    const antes = getCompra().filter(i => i.comprado).map(i => i.id);
+    setColeccion('compra', getCompra().map(i => ({ ...i, comprado: false, marcadoPor: '' })));
+    refrescarApp();
+    aviso('Lista fija desmarcada', {
+      accion: {
+        texto: 'Deshacer',
+        fn: () => {
+          const ids = new Set(antes);
+          setColeccion('compra', getCompra().map(i => (ids.has(i.id) ? { ...i, comprado: true } : i)));
+          refrescarApp();
+        }
+      }
+    });
+  },
+  plegarGrupo: (el) => {
+    const plegados = new Set(getPref('fijaPlegados', []));
+    const cat = el.dataset.cat;
+    if (plegados.has(cat)) plegados.delete(cat);
+    else plegados.add(cat);
+    setPref('fijaPlegados', [...plegados]);
+    const grupo = el.closest('.grupo');
+    grupo.classList.toggle('plegado', plegados.has(cat));
+    el.setAttribute('aria-expanded', !plegados.has(cat));
+  }
+});

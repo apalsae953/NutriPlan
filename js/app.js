@@ -1,304 +1,197 @@
 /* =========================================================
-   APP.JS — Inicialización y utilidades globales
-   Controla la navegación, modales, toasts, FAB y funciones
-   de ayuda compartidas entre módulos (Dietas, Comidas, Compra).
+   APP.JS — Arranque, navegación y piezas globales
    ========================================================= */
 
-// Vista activa en este momento (dietas | comidas | compra)
-let vistaActual = 'dietas';
+const VISTAS = {
+  plan:   { titulo: 'Plan',   render: () => renderizarPlan() },
+  recetas: { titulo: 'Recetas', render: () => renderizarRecetas() },
+  compra: { titulo: 'Compra', render: () => renderizarCompra() }
+};
+
+let vistaActual = 'plan';
 
 /* -------------------------------------------------------
    Arranque de la aplicación
 ------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', async () => {
-  // Inicializar almacenamiento y partidas locales
-  inicializarStorage();
+  pintarIconosEstaticos();
+  const primeraVez = inicializarStorage();
+  aplicarTema(getPref('tema', 'sistema'));
 
-  // Actualizar indicadores de interfaz de partida activa (sidebar y topbar)
-  if (typeof actualizarUIPartidas === 'function') {
-    actualizarUIPartidas();
+  configurarRecetas();
+  configurarCompra();
+  configurarBarra();
+  configurarDeslizar();
+
+  // Accesos directos del icono instalado (?vista=compra) o la última vista usada
+  const params = new URLSearchParams(location.search);
+  const pedida = params.get('vista');
+  if (pedida) {
+    params.delete('vista');
+    history.replaceState(null, '', `${location.pathname}${params.toString() ? `?${params}` : ''}`);
   }
+  const guardada = getPref('vista', 'plan') === 'platos' ? 'recetas' : getPref('vista', 'plan');
+  const inicial = VISTAS[pedida] ? pedida : guardada;
+  irAVista(VISTAS[inicial] ? inicial : 'plan', { sinScroll: true });
 
-  // Comprobar si se ha accedido mediante enlace con código de partida (?partida=CASA24)
-  if (typeof verificarParametroPartidaURL === 'function') {
-    await verificarParametroPartidaURL();
-  }
+  document.addEventListener('sync-estado', actualizarChipFamilia);
+  iniciarSincronizacion();
 
-  // Actualizar banner superior de ejemplos si procede
-  actualizarBannerEjemplos();
+  registrarServiceWorker();
 
-  // Renderizar la vista inicial
-  renderizarDietas();
-
-  // Inicializar iconos de Lucide
-  lucide.createIcons();
-
-  // Configurar swipe para cambiar de vista en móvil
-  configurarSwipe();
+  // Una invitación por enlace tiene prioridad sobre la bienvenida
+  const invitado = await verificarParametroFamiliaURL();
+  if (!invitado) mostrarBienvenidaSiHaceFalta(primeraVez);
 });
 
 /* -------------------------------------------------------
-   Banner / Control de datos de ejemplo opcionales
+   Refrescar lo visible tras cualquier cambio de datos
 ------------------------------------------------------- */
-function actualizarBannerEjemplos() {
-  const banner = document.getElementById('bannerEjemplos');
-  if (!banner) return;
-
-  const hayEjemplos = localStorage.getItem(STORAGE_KEYS.ejemplosCargados) === 'true';
-  const dietasCount = getDietas().length;
-  const comidasCount = getComidas().length;
-  const compraCount = getCompra().length;
-
-  if (hayEjemplos) {
-    banner.innerHTML = `
-      <div class="banner-ejemplo activo">
-        <div class="banner-ejemplo-texto">
-          <i data-lucide="sparkles"></i>
-          <span>Estás viendo los <strong>datos de ejemplo</strong> del sistema. Puedes limpiarlos en cualquier momento para empezar de cero.</span>
-        </div>
-        <button class="btn btn-sm btn-ghost-danger" onclick="limpiarDatosEjemplo()">
-          <i data-lucide="trash-2"></i>
-          Limpiar ejemplos
-        </button>
-      </div>
-    `;
-    banner.style.display = 'block';
-  } else if (dietasCount === 0 && comidasCount === 0 && compraCount === 0) {
-    banner.innerHTML = `
-      <div class="banner-ejemplo aviso">
-        <div class="banner-ejemplo-texto">
-          <i data-lucide="info"></i>
-          <span>Tu aplicación está vacía y lista para usar. Si quieres ver un menú semanal y lista de compra de prueba, pulsa cargar.</span>
-        </div>
-        <button class="btn btn-sm btn-primary" onclick="cargarEjemplosCompletos()">
-          <i data-lucide="sparkles"></i>
-          Cargar ejemplos
-        </button>
-      </div>
-    `;
-    banner.style.display = 'block';
-  } else {
-    banner.style.display = 'none';
-  }
-
-  lucide.createIcons();
+function refrescarApp() {
+  actualizarChipFamilia();
+  actualizarInsigniaCompra();
+  actualizarFab();
+  VISTAS[vistaActual].render();
 }
 
 /* -------------------------------------------------------
    Navegación entre vistas
-   Sincroniza sidebar (escritorio) y bottom nav (móvil)
 ------------------------------------------------------- */
-function cambiarVista(vista, btn) {
+function irAVista(vista, { sinScroll = false } = {}) {
+  if (!VISTAS[vista]) return;
+  const cambia = vista !== vistaActual;
   vistaActual = vista;
+  setPref('vista', vista);
 
-  // Ocultar todas las vistas
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  Object.keys(VISTAS).forEach(v => {
+    document.getElementById(`vista-${v}`).hidden = v !== vista;
+  });
+  document.querySelectorAll('.nav-item').forEach(b => {
+    if (b.dataset.vista === vista) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
+  document.getElementById('barraTitulo').textContent = VISTAS[vista].titulo;
+  document.title = `${VISTAS[vista].titulo} · NutriPlan`;
 
-  // Mostrar la vista seleccionada
-  const viewEl = document.getElementById(`view-${vista}`);
-  if (viewEl) viewEl.classList.add('active');
-
-  // Actualizar nav activo en SIDEBAR (escritorio)
-  document.querySelectorAll('.sidebar .nav-item').forEach(b => b.classList.remove('active'));
-  const sidebarBtn = document.querySelector(`.sidebar .nav-item[data-view="${vista}"]`);
-  if (sidebarBtn) sidebarBtn.classList.add('active');
-
-  // Actualizar BOTTOM NAV (móvil)
-  document.querySelectorAll('.bottom-nav-item').forEach(b => b.classList.remove('active'));
-  const bottomBtn = document.querySelector(`.bottom-nav-item[data-view="${vista}"]`);
-  if (bottomBtn) bottomBtn.classList.add('active');
-
-  if (btn) btn.classList.add('active');
-
-  // Actualizar título del topbar móvil
-  const titulos = {
-    dietas: 'Mis Dietas',
-    comidas: 'Mis Comidas',
-    compra: 'Lista de la Compra'
-  };
-  const topbarTitle = document.getElementById('topbarTitle');
-  if (topbarTitle) topbarTitle.textContent = titulos[vista] || 'NutriPlan';
-
-  // Renderizar la vista correspondiente
-  if (vista === 'dietas') {
-    renderizarDietas();
-  } else if (vista === 'comidas') {
-    renderizarComidas();
-  } else if (vista === 'compra') {
-    renderizarCompra();
-  }
-
-  // Cerrar menú móvil lateral si está abierto
-  cerrarMenuMovil();
-
-  // Scroll al inicio de la vista
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  refrescarApp();
+  if (cambia && !sinScroll) window.scrollTo({ top: 0 });
 }
 
-/* -------------------------------------------------------
-   Botón flotante de acción (FAB)
-   Su función cambia según la vista activa
-------------------------------------------------------- */
-function accionFab() {
-  if (vistaActual === 'dietas') {
-    abrirModalNuevaDieta();
-  } else if (vistaActual === 'comidas') {
-    abrirModalNuevaComida();
-  } else if (vistaActual === 'compra') {
-    abrirModalNuevoIngrediente();
-  }
-
-  // Animación de pulsación
-  const fab = document.getElementById('fabBtn');
-  if (fab) {
-    fab.classList.add('rotado');
-    setTimeout(() => fab.classList.remove('rotado'), 300);
-  }
-}
-
-/* -------------------------------------------------------
-   Menú móvil lateral
-------------------------------------------------------- */
-function abrirMenuMovil() {
-  document.getElementById('sidebar').classList.add('mobile-open');
-  document.getElementById('overlay').classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function cerrarMenuMovil() {
-  document.getElementById('sidebar').classList.remove('mobile-open');
-  document.getElementById('overlay').classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-/* -------------------------------------------------------
-   Modales
-------------------------------------------------------- */
-function abrirModal(id) {
-  const modal = document.getElementById(id);
-  if (modal) {
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  }
-}
-
-function cerrarModal(id) {
-  const modal = document.getElementById(id);
-  if (!modal) return;
-
-  // En móvil: animación de salida hacia abajo antes de ocultar
-  const esMovil = window.innerWidth <= 768;
-  const esSmall = modal.querySelector('.modal-sm');
-
-  if (esMovil && !esSmall) {
-    const contenido = modal.querySelector('.modal');
-    if (contenido) {
-      contenido.style.animation = 'sheetOut .2s ease forwards';
-      setTimeout(() => {
-        modal.classList.remove('active');
-        contenido.style.animation = '';
-        document.body.style.overflow = '';
-      }, 200);
+registrarAcciones({
+  ir: (el) => {
+    if (el.dataset.vista === vistaActual) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-  }
-
-  modal.classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-// Cerrar modal al pulsar en el overlay (fuera del contenido)
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      overlay.classList.remove('active');
-      document.body.style.overflow = '';
-    }
-  });
-});
-
-// Cerrar modales con la tecla Escape
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    document.querySelectorAll('.modal-overlay.active').forEach(m => {
-      m.classList.remove('active');
-      document.body.style.overflow = '';
-    });
-  }
+    irAVista(el.dataset.vista);
+  },
+  fab: () => accionFab()
 });
 
 /* -------------------------------------------------------
-   Swipe horizontal para cambiar entre vistas (móvil)
+   Botón flotante: su función cambia según la vista
 ------------------------------------------------------- */
-function configurarSwipe() {
-  let touchStartX = 0;
-  let touchStartY = 0;
+function configFab() {
+  if (vistaActual === 'plan') {
+    return getDietas().length
+      ? { texto: 'Comida', fn: () => abrirAnadirComidaDia() }
+      : { texto: 'Dieta', fn: () => abrirFormDieta() };
+  }
+  if (vistaActual === 'recetas') return { texto: 'Receta', fn: () => abrirFormReceta() };
+  if (vistaActual === 'compra' && segmentoCompra === 'fija') return { texto: 'Producto', fn: () => abrirFormFija() };
+  return null; // La lista rápida ya tiene su propio campo para añadir
+}
+
+function actualizarFab() {
+  const fab = document.getElementById('fab');
+  const conf = configFab();
+  fab.classList.toggle('oculto', !conf);
+  fab.setAttribute('aria-hidden', !conf);
+  fab.tabIndex = conf ? 0 : -1;
+  if (conf) {
+    document.getElementById('fabTexto').textContent = conf.texto;
+    fab.setAttribute('aria-label', `Añadir ${conf.texto.toLowerCase()}`);
+  }
+}
+
+function accionFab() {
+  const conf = configFab();
+  if (conf) conf.fn();
+}
+
+/* -------------------------------------------------------
+   Barra superior: fondo y título compacto al hacer scroll
+------------------------------------------------------- */
+function configurarBarra() {
+  const barra = document.getElementById('barra');
+  let pendiente = false;
+  const actualizar = () => {
+    pendiente = false;
+    barra.classList.toggle('con-fondo', window.scrollY > 44);
+  };
+  window.addEventListener('scroll', () => {
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(actualizar);
+  }, { passive: true });
+  actualizar();
+}
+
+/* -------------------------------------------------------
+   Deslizar a los lados para cambiar de sección (móvil).
+   Se ignora si el gesto empieza en algo que ya se desplaza
+   en horizontal, en un campo o cerca del borde (gesto de volver).
+------------------------------------------------------- */
+function configurarDeslizar() {
+  let inicio = null;
+  const orden = Object.keys(VISTAS);
 
   document.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
+    const t = e.touches[0];
+    const ancho = window.innerWidth;
+    if (e.touches.length > 1 || Hoja.hayAbiertas() || t.clientX < 24 || t.clientX > ancho - 24 ||
+        e.target.closest('.scroll-x, input, textarea, select')) {
+      inicio = null;
+      return;
+    }
+    inicio = { x: t.clientX, y: t.clientY, t: Date.now() };
   }, { passive: true });
 
   document.addEventListener('touchend', (e) => {
-    if (document.querySelector('.modal-overlay.active')) return;
+    if (!inicio) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - inicio.x;
+    const dy = t.clientY - inicio.y;
+    const rapido = Date.now() - inicio.t < 450;
+    inicio = null;
+    if (!rapido || Math.abs(dx) < 80 || Math.abs(dy) > Math.abs(dx) * 0.4) return;
 
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-
-    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.5) return;
-
-    const vistasOrden = ['dietas', 'comidas', 'compra'];
-    const idx = vistasOrden.indexOf(vistaActual);
-
-    if (dx < 0 && idx < vistasOrden.length - 1) {
-      // Hacia la izquierda -> siguiente vista
-      cambiarVista(vistasOrden[idx + 1], null);
-    } else if (dx > 0 && idx > 0) {
-      // Hacia la derecha -> vista anterior
-      cambiarVista(vistasOrden[idx - 1], null);
-    }
+    const i = orden.indexOf(vistaActual);
+    const destino = orden[dx < 0 ? i + 1 : i - 1];
+    if (destino) irAVista(destino);
   }, { passive: true });
 }
 
 /* -------------------------------------------------------
-   Toast de notificaciones
+   Tema claro / oscuro
 ------------------------------------------------------- */
-function mostrarToast(mensaje, tipo = 'success') {
-  const container = document.getElementById('toastContainer');
-  if (!container) return;
+function aplicarTema(tema) {
+  const raiz = document.documentElement;
+  if (tema === 'claro' || tema === 'oscuro') raiz.dataset.tema = tema;
+  else delete raiz.dataset.tema;
 
-  const iconos = {
-    success: 'check-circle',
-    error:   'x-circle',
-    info:    'info'
-  };
-
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${tipo}`;
-  toast.innerHTML = `
-    <i data-lucide="${iconos[tipo] || 'info'}"></i>
-    <span>${escapeHtml(mensaje)}</span>
-  `;
-
-  container.appendChild(toast);
-  lucide.createIcons({ nodes: [toast] });
-
-  // Auto-eliminar tras 3 segundos
-  setTimeout(() => {
-    toast.classList.add('saliendo');
-    setTimeout(() => toast.remove(), 250);
-  }, 3000);
+  // Color de la barra de estado del móvil
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  metas.forEach(m => {
+    const porDefecto = m.media.includes('dark') ? '#151412' : '#f4f1ea';
+    m.content = tema === 'oscuro' ? '#151412' : tema === 'claro' ? '#f4f1ea' : porDefecto;
+  });
 }
 
 /* -------------------------------------------------------
-   Utilidad: escapar HTML para evitar XSS
+   Funcionamiento sin conexión (service worker)
 ------------------------------------------------------- */
-function escapeHtml(str) {
-  if (typeof str !== 'string') return str || '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+function registrarServiceWorker() {
+  if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
