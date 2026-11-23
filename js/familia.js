@@ -115,6 +115,7 @@ function abrirFamilia() {
       ${miembros.length < 2 ? `<p class="campo-ayuda" style="margin-top:10px">${activa.codigo
         ? 'Todavía no ha entrado nadie más. Mándales la invitación desde el botón de arriba.'
         : 'Ahora mismo solo estás tú. Invita a tu familia y compartiréis listas, recetas y dietas al momento.'}</p>` : ''}
+      ${sincronizable(activa) ? `<p class="campo-ayuda" style="margin-top:10px">Si cambias de móvil o lo pierdes, entra con el código <strong>${esc(activa.codigo)}</strong> y lo recuperas todo.</p>` : ''}
 
       <h3 class="titulo-seccion">${otras.length ? 'Tus otras familias' : 'Otras familias'} ${otras.length ? `<small>${otras.length}</small>` : ''}</h3>
       ${otras.length ? `
@@ -233,9 +234,15 @@ async function salirDeFamilia(id) {
   if (!ok) return;
 
   if (sincronizable(f)) {
-    // Quitarme de los miembros y subirlo antes de borrarla aquí
-    actualizarFamilia(id, { miembros: (f.miembros || []).filter(m => m.id !== getYo().id) });
-    await empujarCambios(id);
+    // Quitarme de los miembros (si era el último, la nube la borra) antes de borrarla aquí
+    let hecho = false;
+    try {
+      hecho = await API.salir(f.codigo, getYo().id);
+    } catch (e) { /* sin conexión: al menos se intenta dejarlo apuntado */ }
+    if (!hecho) {
+      actualizarFamilia(id, { miembros: (f.miembros || []).filter(m => m.id !== getYo().id) });
+      await empujarCambios(id);
+    }
   }
   eliminarFamilia(id);
   diaPlan = indiceHoy();
@@ -277,6 +284,11 @@ function htmlCampoNombre(autofocus = false, { etiqueta = 'Tu nombre', valor = ge
       ${ayuda ? `<span class="campo-ayuda">${esc(ayuda)}</span>` : ''}
     </label>
   `;
+}
+
+// Línea discreta con los enlaces legales, donde se piden datos por primera vez
+function htmlNotaLegal(inicio) {
+  return `<p class="nota-legal">${esc(inicio)} <a href="aviso-legal">condiciones de uso</a>. Cómo se guardan tus datos: <a href="privacidad">privacidad</a>.</p>`;
 }
 
 // Lo que se explica bajo el campo de "cómo te ven en esta familia"
@@ -742,6 +754,7 @@ function abrirBienvenida() {
           ${htmlCampoNombre(true).replace('Tu nombre', '¿Cómo te llamas?')}
           <button type="submit" class="boton boton-primario boton-bloque">Continuar</button>
         </form>
+        ${htmlNotaLegal('Al continuar aceptas las')}
       </div>
     `,
     modo: () => `
@@ -890,7 +903,7 @@ function abrirAvisoFamilias() {
     cuerpo: `
       <p class="antetitulo">Novedad</p>
       <h2 class="alerta-titulo">Ahora NutriPlan va por familias</h2>
-      <p class="alerta-texto">Tus partidas se han convertido en familias con todo lo que tenían. Cada familia reúne la compra, las recetas y las dietas, y ves quién está dentro y quién añade cada cosa.</p>
+      <p class="alerta-texto">Todo lo que tenías sigue aquí, ahora dentro de tu familia. Cada familia reúne la compra, las recetas y las dietas, y ves quién está dentro y quién añade cada cosa.</p>
       <form id="formAvisoFamilias" novalidate style="margin-top:16px">${htmlCampoNombre(false)}</form>
     `,
     pie: `
@@ -990,6 +1003,7 @@ function mostrarInvitacion(sala, alUnirse) {
             valor: (yaEstuve && yaEstuve.nombre) || getYo().nombre,
             ayuda: ayudaNombreFamilia()
           })}</form>
+          ${htmlNotaLegal('Al unirte, los de la familia verán este nombre y lo que añadas. Aceptas las')}
         </div>
       `,
       pie: `
@@ -1054,6 +1068,40 @@ async function importarCopia(archivo) {
     aviso(e instanceof SyntaxError ? 'El archivo está dañado o no es JSON' : e.message, { tipo: 'error' });
   }
 }
+
+/* -------------------------------------------------------
+   Avisos de lo que hacen los demás (con la app abierta)
+   «Lucía ha añadido Leche y Pan» · «Antonio ha cogido Huevos»
+------------------------------------------------------- */
+function listaNatural(cosas) {
+  const visibles = cosas.slice(0, 3);
+  const resto = cosas.length - visibles.length;
+  if (resto > 0) return `${visibles.join(', ')} y ${resto} más`;
+  return visibles.length > 1 ? `${visibles.slice(0, -1).join(', ')} y ${visibles[visibles.length - 1]}` : visibles[0];
+}
+
+document.addEventListener('novedades-familia', (e) => {
+  const eventos = e.detail || [];
+  // Lo que han añadido los demás entra resaltado en la lista
+  eventos.filter(ev => ev.tipo === 'anade').forEach(ev => recienAnadidos.add(ev.id));
+  if (!getPref('avisosFamilia', true) || document.hidden) return;
+
+  const grupos = new Map();
+  eventos.forEach(ev => {
+    const clave = `${ev.quien}|${ev.tipo}`;
+    if (!grupos.has(clave)) grupos.set(clave, { ...ev, cosas: [] });
+    grupos.get(clave).cosas.push(ev.que);
+  });
+  const frases = [...grupos.values()].map(g => {
+    if (g.tipo === 'entra') return `${g.que} se ha unido a la familia`;
+    const quien = nombreMiembro(g.quien) || 'Alguien de la familia';
+    if (g.tipo === 'anade') return `${quien} ha añadido ${listaNatural(g.cosas)}`;
+    if (g.tipo === 'coge') return `${quien} ha cogido ${listaNatural(g.cosas)}`;
+    return g.cosas.length === 1 ? `${quien} ha añadido la receta «${g.cosas[0]}»` : `${quien} ha añadido ${g.cosas.length} recetas`;
+  });
+  frases.slice(0, 2).forEach(f => aviso(f, { duracion: 3500 }));
+  vibrar(8);
+});
 
 /* -------------------------------------------------------
    Acciones registradas

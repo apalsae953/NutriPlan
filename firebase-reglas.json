@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "salas": {
+      "$codigo": {
+        ".read": "$codigo.matches(/^[A-Z0-9]{4,12}$/)",
+        ".write": "$codigo.matches(/^[A-Z0-9]{4,12}$/) && ((!data.exists() && newData.child('version').val() === 1) || (data.exists() && newData.exists() && newData.child('version').val() === data.child('version').val() + 1) || (data.exists() && !newData.exists() && !data.child('miembros').exists()))",
+        ".validate": "newData.hasChildren(['version', 'nombre', 'actualizadaEn'])",
+        "version": { ".validate": "newData.isNumber()" },
+        "nombre": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "descripcion": { ".validate": "newData.isString() && newData.val().length <= 500" },
+        "actualizadaEn": { ".validate": "newData.isNumber() && newData.val() <= now" },
+        "dietas": { ".validate": "newData.hasChildren()" },
+        "comidas": { ".validate": "newData.hasChildren()" },
+        "compra": { ".validate": "newData.hasChildren()" },
+        "rapida": { ".validate": "newData.hasChildren()" },
+        "historial": { ".validate": "newData.hasChildren()" },
+        "miembros": { ".validate": "newData.hasChildren()" },
+        "$otro": { ".validate": false }
+      }
+    }
+  }
+}

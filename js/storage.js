@@ -29,7 +29,7 @@ const STORAGE_KEYS = {
   compraLegacy:     'nutriplan_compra'
 };
 
-const VERSION_APP = '3.5.0';
+const VERSION_APP = '3.8.0';
 
 // Colecciones de cada familia que se sincronizan
 const COLECCIONES = ['dietas', 'comidas', 'compra', 'rapida', 'historial', 'miembros'];
@@ -319,6 +319,7 @@ const Sync = {
   tGuardar: null,
   tReintento: null,
   tSondeo: null,
+  ultimoSondeo: 0,
   porSubir: new Set()
 };
 
@@ -330,6 +331,7 @@ function fijarEstadoSync(estado) {
 
 function estadoSyncSegunFamilia() {
   const p = getFamiliaActiva();
+  abrirDirecto(); // Abre el aviso instantáneo de esta familia (o cierra el de la anterior)
   if (!p || !p.codigo) return fijarEstadoSync('local');
   if (!sincronizable(p)) return fijarEstadoSync('enlace');
   if (p.pendiente) return fijarEstadoSync(navigator.onLine === false ? 'sin-conexion' : 'guardando');
@@ -373,9 +375,13 @@ async function empujarCambios(id = getFamiliaActivaId()) {
 
     if (r.estado === 'conflicto') {
       // Otra persona guardó antes: fusionar y volver a intentar
+      const antes = resumenParaNovedades(actual);
       fusionarConRemoto(actual, r.sala);
       guardarFamilias();
-      if (id === getFamiliaActivaId()) refrescarDesdeSync();
+      if (id === getFamiliaActivaId()) {
+        anunciarNovedades(antes, actual);
+        refrescarDesdeSync();
+      }
       Sync.repetir = actual.pendiente;
     } else if (r.estado === 'ok') {
       actual.base = enviado;
@@ -409,10 +415,13 @@ function empujarPendientes() {
 /* -------------------------------------------------------
    Sondeo ligero de cambios remotos
 ------------------------------------------------------- */
-async function sondearRemoto() {
+async function sondearRemoto(forzar = false) {
   if (document.hidden || Sync.enCurso) return;
   const p = getFamiliaActiva();
   if (!sincronizable(p)) return;
+  // Con el aviso instantáneo de Firebase abierto, el sondeo es solo una red de seguridad
+  if (!forzar && directoActivo(p.codigo) && Date.now() - Sync.ultimoSondeo < 30000) return;
+  Sync.ultimoSondeo = Date.now();
 
   try {
     const version = await API.version(p.codigo);
@@ -420,7 +429,7 @@ async function sondearRemoto() {
       fijarEstadoSync('perdida');
       return;
     }
-    if (version > (p.versionRemota || 0)) {
+    if (version !== (p.versionRemota || 0)) {
       await traerRemoto(p.id);
     } else if (p.pendiente) {
       if (Sync.estado === 'sin-conexion') empujarCambios(p.id);
@@ -442,12 +451,111 @@ async function traerRemoto(id) {
 
   const actual = getFamiliaPorId(id);
   if (!actual) return;
+  const antes = resumenParaNovedades(actual);
   fusionarConRemoto(actual, sala);
   guardarFamilias();
 
-  if (id === getFamiliaActivaId()) refrescarDesdeSync();
+  if (id === getFamiliaActivaId()) {
+    anunciarNovedades(antes, actual);
+    refrescarDesdeSync();
+  }
   if (actual.pendiente) programarSincronizacion(50);
   else estadoSyncSegunFamilia();
+}
+
+/* -------------------------------------------------------
+   Aviso instantáneo de cambios (Firebase)
+   Firebase manda un aviso en cuanto cambia la versión de la
+   familia abierta, así que los cambios de los demás llegan al
+   momento sin preguntar cada pocos segundos. Se cierra al
+   esconder la app y se vuelve a abrir al volver.
+------------------------------------------------------- */
+const Directo = { fuente: null, codigo: '', descartado: '' };
+
+function directoActivo(codigo) {
+  return !!(Directo.fuente && Directo.codigo === codigo && Directo.fuente.readyState === 1);
+}
+
+function abrirDirecto() {
+  const p = getFamiliaActiva();
+  const codigo = usaFirebase() && sincronizable(p) && !document.hidden &&
+    typeof EventSource !== 'undefined' && p.codigo !== Directo.descartado ? p.codigo : '';
+  if (codigo && Directo.codigo === codigo && Directo.fuente && Directo.fuente.readyState !== 2) return;
+  cerrarDirecto();
+  if (!codigo) return;
+
+  const fuente = new EventSource(Firebase.ruta(codigo, '/version'));
+  Directo.fuente = fuente;
+  Directo.codigo = codigo;
+
+  const alCambiar = (e) => {
+    let aviso = null;
+    try { aviso = JSON.parse(e.data); } catch (err) { return; }
+    const actual = getFamiliaActiva();
+    if (!actual || actual.codigo !== codigo || !aviso || aviso.path !== '/') return;
+    const version = aviso.data;
+    if (version === null) {
+      fijarEstadoSync('perdida');
+    } else if (version !== actual.versionRemota) {
+      // Si hay una subida en marcha, se mira cuando acabe
+      if (Sync.enCurso) setTimeout(() => sondearRemoto(true), 800);
+      else traerRemoto(actual.id);
+    } else if (!actual.pendiente) {
+      fijarEstadoSync('ok');
+    }
+  };
+  fuente.addEventListener('put', alCambiar);
+  fuente.addEventListener('patch', alCambiar);
+  // Firebase corta el aviso si las reglas no lo permiten: no insistir con esa familia
+  fuente.addEventListener('cancel', () => {
+    Directo.descartado = codigo;
+    cerrarDirecto();
+  });
+  // Si se corta la conexión, el navegador lo reabre solo; mientras, sigue el sondeo
+}
+
+function cerrarDirecto() {
+  if (Directo.fuente) Directo.fuente.close();
+  Directo.fuente = null;
+  Directo.codigo = '';
+}
+
+/* -------------------------------------------------------
+   Novedades: qué han hecho los demás desde la última vez
+   («Lucía ha añadido Leche y Pan»). Se comparan las listas
+   antes y después de juntar lo que llega de la nube.
+------------------------------------------------------- */
+function resumenParaNovedades(p) {
+  const porId = (lista) => new Map((lista || []).filter(x => x && x.id != null).map(x => [x.id, x]));
+  return {
+    rapida: porId(p.rapida),
+    compra: porId(p.compra),
+    comidas: porId(p.comidas),
+    miembros: porId(p.miembros)
+  };
+}
+
+function anunciarNovedades(antes, p) {
+  const yo = getYo().id;
+  const eventos = [];
+  ['rapida', 'compra'].forEach(col => {
+    (p[col] || []).forEach(i => {
+      if (!i || i.id == null) return;
+      const previo = antes[col].get(i.id);
+      if (!previo && i.autor && i.autor !== yo) {
+        eventos.push({ tipo: 'anade', quien: i.autor, que: i.nombre, id: i.id, lista: col });
+      } else if (previo && !previo.comprado && i.comprado && i.marcadoPor && i.marcadoPor !== yo) {
+        eventos.push({ tipo: 'coge', quien: i.marcadoPor, que: i.nombre, id: i.id, lista: col });
+      }
+    });
+  });
+  (p.comidas || []).forEach(r => {
+    if (r && !antes.comidas.has(r.id) && r.autor && r.autor !== yo) eventos.push({ tipo: 'receta', quien: r.autor, que: r.nombre, id: r.id });
+  });
+  (p.miembros || []).forEach(m => {
+    if (m && !antes.miembros.has(m.id) && m.id !== yo) eventos.push({ tipo: 'entra', quien: m.id, que: m.nombre, id: m.id });
+  });
+  if (eventos.length) document.dispatchEvent(new CustomEvent('novedades-familia', { detail: eventos }));
 }
 
 function refrescarDesdeSync() {
@@ -460,12 +568,14 @@ function iniciarSincronizacion() {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      cerrarDirecto();
       // Intentar dejar subido lo pendiente antes de que el sistema congele la app
       getFamilias().filter(p => sincronizable(p) && p.pendiente).forEach(p => {
         API.guardarAlCerrar(p.codigo, p.versionRemota || 1, instantanea(p));
       });
     } else {
-      sondearRemoto();
+      abrirDirecto();
+      sondearRemoto(true);
     }
   });
 
@@ -590,6 +700,9 @@ async function llamarServidor(ruta, opciones = {}) {
     clearTimeout(limite);
   }
 
+  // Respuesta vacía a propósito (Firebase con print=silent)
+  if (res.status === 204) return { res, datos: null };
+
   // Si no contesta con JSON, quien responde no es el servidor de NutriPlan
   const esJson = (res.headers.get('content-type') || '').includes('application/json');
   if (!esJson) throw errorServidor(res.status >= 500 && res.status !== 501 ? 'sin-respuesta' : 'sin-servidor');
@@ -599,13 +712,111 @@ async function llamarServidor(ruta, opciones = {}) {
 }
 
 /* -------------------------------------------------------
-   Dónde se guardan las familias compartidas
-   - Supabase (js/nube.js): lo normal; la web llama directamente
-     a sus funciones con la clave pública. No hay servidor propio.
+   Dónde se guardan las familias compartidas (js/nube.js)
+   - Firebase Realtime Database: la web habla directamente con
+     ella; sus reglas impiden listar familias y pisar cambios.
+   - Supabase: la web llama a sus funciones con la clave pública.
    - server.py: solo si no hay nube configurada (uso en local).
-   Las dos opciones responden igual para el resto de la app.
+   Todas responden igual para el resto de la app.
 ------------------------------------------------------- */
-const usaNube = () => !!(typeof NUBE !== 'undefined' && NUBE.url && NUBE.clave);
+const usaFirebase = () => !!(typeof NUBE !== 'undefined' && NUBE.tipo === 'firebase' && NUBE.url);
+const usaNube = () => !!(typeof NUBE !== 'undefined' && NUBE.tipo !== 'firebase' && NUBE.url && NUBE.clave);
+
+/*
+  Firebase guarda cada familia en /salas/CÓDIGO con su versión. Se
+  escribe la familia entera con la versión siguiente; las reglas solo
+  lo aceptan si es nueva (versión 1) o si va justo detrás de la que
+  hay, así que si otra persona guardó antes, la escritura se rechaza
+  y la app junta los cambios y vuelve a intentarlo.
+*/
+const Firebase = {
+  ruta(codigo, resto = '') {
+    return `${NUBE.url}/salas/${encodeURIComponent(codigo)}${resto}.json`;
+  },
+
+  // Firebase no guarda listas vacías y puede devolver listas como objetos
+  aLista(v) {
+    if (Array.isArray(v)) return v.filter(x => x != null);
+    if (v && typeof v === 'object') return Object.keys(v).sort((a, b) => a - b).map(k => v[k]).filter(x => x != null);
+    return [];
+  },
+
+  aSala(codigo, d) {
+    const sala = { codigo, nombre: d.nombre || '', descripcion: d.descripcion || '', version: d.version || 1 };
+    COLECCIONES.forEach(col => { sala[col] = this.aLista(d[col]); });
+    return sala;
+  },
+
+  cuerpo(datos, version) {
+    const c = { nombre: datos.nombre || 'Mi familia', descripcion: datos.descripcion || '', version, actualizadaEn: { '.sv': 'timestamp' } };
+    COLECCIONES.forEach(col => { if (Array.isArray(datos[col]) && datos[col].length) c[col] = datos[col]; });
+    return c;
+  },
+
+  async leer(codigo) {
+    const { res, datos } = await llamarServidor(this.ruta(codigo));
+    if (!res.ok) throw errorServidor('sin-respuesta');
+    return datos ? this.aSala(codigo, datos) : null;
+  },
+
+  // → true si se guardó; false si las reglas no lo dejan (otra versión)
+  async escribir(codigo, version, datos, opciones = {}) {
+    const { res } = await llamarServidor(`${this.ruta(codigo)}?print=silent`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this.cuerpo(datos, version)),
+      ...opciones
+    });
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403) return false;
+    throw errorServidor('sin-respuesta');
+  },
+
+  async crear(datos, codigoDeseado) {
+    for (let intento = 0; intento < 5; intento++) {
+      const codigo = codigoDeseado || generarCodigoFamilia();
+      if (await this.escribir(codigo, 1, datos)) return { existia: false, codigo, version: 1 };
+      const sala = await this.leer(codigo);
+      if (codigoDeseado) {
+        if (sala) return { existia: true, sala };
+        throw errorServidor('sin-respuesta');
+      }
+      // Ese código ya lo usa otra familia: se prueba otro
+    }
+    throw errorServidor('sin-respuesta');
+  },
+
+  async version(codigo) {
+    const { res, datos } = await llamarServidor(this.ruta(codigo, '/version'));
+    if (!res.ok) throw errorServidor('sin-respuesta');
+    return typeof datos === 'number' ? datos : null;
+  },
+
+  async guardar(codigo, baseVersion, datos) {
+    if (await this.escribir(codigo, baseVersion + 1, datos)) return { estado: 'ok', version: baseVersion + 1 };
+    const sala = await this.leer(codigo);
+    if (!sala) return { estado: 'no-existe' };
+    // Misma versión y aun así rechazada: datos que las reglas no aceptan
+    if (sala.version === baseVersion) throw errorServidor('sin-respuesta');
+    return { estado: 'conflicto', sala };
+  },
+
+  // Te quita de los miembros; si no queda nadie, la familia se borra
+  async salir(codigo, idMiembro) {
+    for (let intento = 0; intento < 3; intento++) {
+      const sala = await this.leer(codigo);
+      if (!sala) return;
+      const miembros = sala.miembros.filter(m => m && m.id !== idMiembro);
+      if (miembros.length === sala.miembros.length) return;
+      if (await this.escribir(codigo, sala.version + 1, { ...sala, miembros })) {
+        if (!miembros.length) {
+          await llamarServidor(`${this.ruta(codigo)}?print=silent`, { method: 'DELETE' }).catch(() => {});
+        }
+        return;
+      }
+    }
+  }
+};
 
 function llamarNube(funcion, args, opciones = {}) {
   return llamarServidor(`${NUBE.url}/rest/v1/rpc/${funcion}`, {
@@ -619,6 +830,7 @@ function llamarNube(funcion, args, opciones = {}) {
 const API = {
   // → { existia: false, codigo, version } o { existia: true, sala } si ese código ya estaba
   async crear(datos, codigoDeseado = null) {
+    if (usaFirebase()) return Firebase.crear(datos, codigoDeseado);
     if (usaNube()) {
       const { res, datos: r } = await llamarNube('crear_sala', { p_datos: datos, p_codigo: codigoDeseado });
       if (!res.ok || !r) throw errorServidor('sin-respuesta');
@@ -635,6 +847,7 @@ const API = {
 
   // → la familia, o null si no existe
   async obtener(codigo) {
+    if (usaFirebase()) return Firebase.leer(codigo);
     if (usaNube()) {
       const { res, datos } = await llamarNube('obtener_sala', { p_codigo: codigo });
       if (!res.ok) throw errorServidor('sin-respuesta');
@@ -648,6 +861,7 @@ const API = {
 
   // → número de versión, o null si no existe
   async version(codigo) {
+    if (usaFirebase()) return Firebase.version(codigo);
     if (usaNube()) {
       const { res, datos } = await llamarNube('version_sala', { p_codigo: codigo });
       if (!res.ok) throw errorServidor('sin-respuesta');
@@ -661,6 +875,7 @@ const API = {
 
   // → { estado: 'ok', version } | { estado: 'conflicto', sala } | { estado: 'no-existe' }
   async guardar(codigo, baseVersion, datos) {
+    if (usaFirebase()) return Firebase.guardar(codigo, baseVersion, datos);
     if (usaNube()) {
       const { res, datos: r } = await llamarNube('guardar_sala', { p_codigo: codigo, p_base_version: baseVersion, p_datos: datos });
       if (!res.ok || !r) throw errorServidor('sin-respuesta');
@@ -679,9 +894,26 @@ const API = {
     return { estado: 'ok', version: r.version };
   },
 
+  // Salir de una familia; si eras el último miembro, se borra de la nube.
+  // → true si se hizo en la nube; false si toca hacerlo a la antigua (server.py)
+  async salir(codigo, idMiembro) {
+    if (usaFirebase()) {
+      await Firebase.salir(codigo, idMiembro);
+      return true;
+    }
+    if (!usaNube()) return false;
+    const { res } = await llamarNube('salir_de_sala', { p_codigo: codigo, p_miembro: idMiembro });
+    if (!res.ok) throw errorServidor('sin-respuesta');
+    return true;
+  },
+
   // Al cerrar o esconder la app: se intenta subir sin esperar respuesta
   guardarAlCerrar(codigo, baseVersion, datos) {
     try {
+      if (usaFirebase()) {
+        Firebase.escribir(codigo, baseVersion + 1, datos, { keepalive: true }).catch(() => {});
+        return;
+      }
       const peticion = usaNube()
         ? llamarNube('guardar_sala', { p_codigo: codigo, p_base_version: baseVersion, p_datos: datos }, { keepalive: true })
         : llamarServidor(`/api/sala/${encodeURIComponent(codigo)}/guardar`, {
@@ -956,7 +1188,7 @@ function juntarCopias(p, datos) {
 let subiendoEnlaces = false;
 
 async function subirFamiliasPorEnlace() {
-  if (!usaNube() || subiendoEnlaces) return;
+  if (!(usaNube() || usaFirebase()) || subiendoEnlaces) return;
   const pendientes = getFamilias().filter(f => f.codigo && f.registrada === false);
   if (!pendientes.length) return;
 

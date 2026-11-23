@@ -4,6 +4,27 @@
    inferior pasa a ser un menú lateral.
    ========================================================= */
 
+/* Fraunces (SIL Open Font License 1.1, ver fuentes/OFL.txt).
+   Servida desde la propia web, sin pasar por Google. Es variable:
+   un solo archivo cubre los pesos 500 y 600. */
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url("../fuentes/fraunces-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url("../fuentes/fraunces-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
   color-scheme: light;
 
@@ -19,7 +40,7 @@
   /* Texto */
   --tinta:          #1d1b18;
   --tinta-2:        #5c564d;
-  --tinta-3:        #8d867b;
+  --tinta-3:        #6b665d; /* 4,5:1 o más sobre fondo y superficies */
 
   /* Acento único: verde bosque */
   --acento:         #2d6a46;
@@ -92,7 +113,7 @@
     --translucido:    rgba(21, 20, 18, .82);
     --tinta:          #eeeae2;
     --tinta-2:        #aea79c;
-    --tinta-3:        #7e786e;
+    --tinta-3:        #938e84;
     --acento:         #7cb48e;
     --acento-fuerte:  #94c6a3;
     --acento-suave:   #22322a;
@@ -125,7 +146,7 @@
   --translucido:    rgba(21, 20, 18, .82);
   --tinta:          #eeeae2;
   --tinta-2:        #aea79c;
-  --tinta-3:        #7e786e;
+  --tinta-3:        #938e84;
   --acento:         #7cb48e;
   --acento-fuerte:  #94c6a3;
   --acento-suave:   #22322a;

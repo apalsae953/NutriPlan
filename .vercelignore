@@ -1,0 +1,8 @@
+# Lo que nunca debe publicarse en la web
+*.db
+*.py
+__pycache__/
+.claude/
+.gitignore
+.vercelignore
+firebase-reglas.json

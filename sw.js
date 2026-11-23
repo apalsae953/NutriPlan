@@ -2,19 +2,23 @@
    SERVICE WORKER — Funcionamiento sin conexión
    - App (HTML, CSS, JS): primero la red, si no hay, la copia
      guardada. Así las actualizaciones llegan al momento.
-   - Fuentes: copia guardada y se refresca en segundo plano.
-   - API de sincronización: nunca se guarda en caché.
+   - La sincronización (Supabase, /api) y las estadísticas
+     de Vercel nunca pasan por la caché.
    ========================================================= */
 
-const CACHE = 'nutriplan-3.5.0';
+const CACHE = 'nutriplan-3.8.0';
 
 const ARCHIVOS = [
   './',
   'index.html',
   'manifest.webmanifest',
+  'fuentes/fraunces-latin.woff2',
+  'fuentes/fraunces-latin-ext.woff2',
   'css/base.css',
   'css/componentes.css',
   'css/vistas.css',
+  'js/tema.js',
+  'js/estadisticas.js',
   'js/iconos.js',
   'js/utilidades.js',
   'js/ui.js',
@@ -54,15 +58,10 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  if (url.origin === location.origin) {
-    if (url.pathname.startsWith('/api/')) return;
-    e.respondWith(redPrimero(req));
-    return;
-  }
-
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    e.respondWith(cacheYActualizar(req));
-  }
+  // Solo se encarga de los archivos de la propia web
+  if (url.origin !== location.origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_vercel/')) return;
+  e.respondWith(redPrimero(req));
 });
 
 async function redPrimero(req) {
@@ -77,16 +76,4 @@ async function redPrimero(req) {
     if (req.mode === 'navigate') return cache.match('index.html');
     throw err;
   }
-}
-
-async function cacheYActualizar(req) {
-  const cache = await caches.open(CACHE);
-  const guardada = await cache.match(req);
-  const red = fetch(req)
-    .then(res => {
-      if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
-      return res;
-    })
-    .catch(() => guardada);
-  return guardada || red;
 }

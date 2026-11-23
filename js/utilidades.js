@@ -53,11 +53,19 @@ function clonar(valor) {
   return JSON.parse(JSON.stringify(valor));
 }
 
+// Un campo vacío ([] , {} o null) cuenta como si no estuviera: la base de
+// datos de Firebase no guarda listas vacías y así las copias siguen siendo "iguales"
+function campoVacio(v) {
+  if (v === undefined || v === null) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  return typeof v === 'object' && Object.keys(v).length === 0;
+}
+
 function serializarEstable(valor) {
   if (Array.isArray(valor)) return `[${valor.map(serializarEstable).join(',')}]`;
   if (valor && typeof valor === 'object') {
     return `{${Object.keys(valor).sort()
-      .filter(k => valor[k] !== undefined)
+      .filter(k => !campoVacio(valor[k]))
       .map(k => `${JSON.stringify(k)}:${serializarEstable(valor[k])}`)
       .join(',')}}`;
   }

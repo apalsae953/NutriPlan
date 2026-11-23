@@ -1416,3 +1416,26 @@
   font-size: 13.5px;
   line-height: 1.45;
 }
+
+/* Enlaces legales: discretos, donde se piden datos por primera vez */
+.nota-legal {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--tinta-3);
+}
+
+.nota-legal a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a.fila {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.fila:active {
+  background: var(--superficie-2);
+}

@@ -1,0 +1,138 @@
+/* =========================================================
+   PÁGINAS DE TEXTO — Privacidad, aviso legal y 404
+   Usan las variables y la tipografía de base.css
+   ========================================================= */
+
+.documento {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: calc(18px + var(--seguro-arriba)) calc(var(--margen) + var(--seguro-der)) calc(48px + var(--seguro-abajo)) calc(var(--margen) + var(--seguro-izq));
+}
+
+.documento-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.documento-volver svg {
+  width: 20px;
+  height: 20px;
+}
+
+.documento header {
+  margin: 18px 0 26px;
+}
+
+.documento h1 {
+  font-family: var(--fuente-titulo);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.documento .fecha {
+  font-size: 14px;
+  color: var(--tinta-3);
+}
+
+.documento .resumen {
+  margin: 0 0 30px;
+  padding: 16px 18px;
+  border-radius: var(--r-l);
+  background: var(--superficie);
+  box-shadow: var(--sombra-1);
+}
+
+.documento .resumen p + p {
+  margin-top: 8px;
+}
+
+.documento h2 {
+  font-family: var(--fuente-titulo);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 34px 0 10px;
+}
+
+.documento p,
+.documento li {
+  color: var(--tinta-2);
+  line-height: 1.6;
+}
+
+.documento p + p {
+  margin-top: 10px;
+}
+
+.documento strong {
+  color: var(--tinta);
+  font-weight: 600;
+}
+
+.documento ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.documento li + li {
+  margin-top: 6px;
+}
+
+.documento a {
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.documento .pie {
+  margin-top: 40px;
+  padding-top: 18px;
+  border-top: 1px solid var(--linea);
+  font-size: 14px;
+  color: var(--tinta-3);
+}
+
+/* Página no encontrada */
+.no-encontrada {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+.no-encontrada img {
+  margin: 0 auto 6px;
+}
+
+.no-encontrada h1 {
+  font-family: var(--fuente-titulo);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.no-encontrada p {
+  color: var(--tinta-2);
+  max-width: 34ch;
+  margin: 0 auto;
+}
+
+.no-encontrada a {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: var(--r-m);
+  background: var(--acento);
+  color: var(--sobre-acento);
+  font-weight: 600;
+  text-decoration: none;
+}

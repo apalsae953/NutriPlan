@@ -31,8 +31,14 @@ function abrirAjustes() {
       </div>
 
       <section class="ajustes-bloque">
-        <h3>En la compra</h3>
+        <h3>Día a día</h3>
         <div class="lista">
+          ${htmlInterruptor({
+            nombre: 'avisosFamilia',
+            titulo: 'Avisos de lo que hacen los demás',
+            detalle: '«Lucía ha añadido leche», mientras tienes la app abierta',
+            activo: getPref('avisosFamilia', true)
+          })}
           ${htmlInterruptor({
             nombre: 'vibracion',
             titulo: 'Vibración',
@@ -102,6 +108,14 @@ function abrirAjustes() {
         <div class="lista">
           ${htmlFilaInstalar()}
           <button class="fila" data-x="actualizar">${ico('repetir')}<span class="fila-texto"><span class="fila-titulo">Actualizar la app</span><span class="fila-detalle ajuste-detalle">Tienes la ${VERSION_APP}. Úsalo si en otro móvil algo se ve distinto</span></span></button>
+        </div>
+      </section>
+
+      <section class="ajustes-bloque">
+        <h3>Legal</h3>
+        <div class="lista">
+          <a class="fila" href="privacidad">${ico('info')}<span class="fila-texto"><span class="fila-titulo">Privacidad y cookies</span><span class="fila-detalle ajuste-detalle">Qué se guarda, dónde y cómo borrarlo</span></span>${ico('chevron_der', 'ico-final')}</a>
+          <a class="fila" href="aviso-legal">${ico('nota')}<span class="fila-texto"><span class="fila-titulo">Aviso legal y condiciones de uso</span></span>${ico('chevron_der', 'ico-final')}</a>
         </div>
       </section>
     `
