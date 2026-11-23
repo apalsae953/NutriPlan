@@ -8,17 +8,17 @@
 
 // El "id" coincide con las categorías guardadas por versiones anteriores
 const CATEGORIAS = [
-  { id: 'Verduras y hortalizas', nombre: 'Fruta y verdura',          color: '#6f9a45' },
-  { id: 'Carnes y pescados',     nombre: 'Carne y pescado',          color: '#b4553f' },
-  { id: 'Lácteos y huevos',      nombre: 'Lácteos y huevos',         color: '#c9a24a' },
-  { id: 'Panadería',             nombre: 'Pan y bollería',           color: '#a87a4a' },
-  { id: 'Legumbres y cereales',  nombre: 'Pasta, arroz y legumbres', color: '#b88d3c' },
-  { id: 'Conservas',             nombre: 'Conservas',                color: '#8c6f5a' },
-  { id: 'Condimentos y aceites', nombre: 'Aceites, salsas y especias', color: '#9a8a3a' },
-  { id: 'Congelados',            nombre: 'Congelados',               color: '#5b84a8' },
-  { id: 'Bebidas',               nombre: 'Bebidas',                  color: '#6f7fb0' },
-  { id: 'Limpieza e higiene',    nombre: 'Limpieza e higiene',       color: '#7b9a9a' },
-  { id: 'Otros',                 nombre: 'Otros',                    color: '#8f877b' }
+  { id: 'Verduras y hortalizas', nombre: 'Fruta y verdura',          color: '#6f9a45', icono: 'cat_fruta' },
+  { id: 'Carnes y pescados',     nombre: 'Carne y pescado',          color: '#b4553f', icono: 'cat_carne' },
+  { id: 'Lácteos y huevos',      nombre: 'Lácteos y huevos',         color: '#c9a24a', icono: 'cat_lacteos' },
+  { id: 'Panadería',             nombre: 'Pan y bollería',           color: '#a87a4a', icono: 'cat_pan' },
+  { id: 'Legumbres y cereales',  nombre: 'Pasta, arroz y legumbres', color: '#b88d3c', icono: 'cat_cereales' },
+  { id: 'Conservas',             nombre: 'Conservas',                color: '#8c6f5a', icono: 'cat_conservas' },
+  { id: 'Condimentos y aceites', nombre: 'Aceites, salsas y especias', color: '#9a8a3a', icono: 'cat_aceites' },
+  { id: 'Congelados',            nombre: 'Congelados',               color: '#5b84a8', icono: 'cat_congelados' },
+  { id: 'Bebidas',               nombre: 'Bebidas',                  color: '#6f7fb0', icono: 'cat_bebidas' },
+  { id: 'Limpieza e higiene',    nombre: 'Limpieza e higiene',       color: '#7b9a9a', icono: 'cat_limpieza' },
+  { id: 'Otros',                 nombre: 'Otros',                    color: '#8f877b', icono: 'cat_otros' }
 ];
 
 const CATEGORIA_POR_ID = Object.fromEntries(CATEGORIAS.map(c => [c.id, c]));

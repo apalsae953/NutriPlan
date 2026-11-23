@@ -96,11 +96,17 @@ function htmlProgreso(hechos, total, texto) {
   `;
 }
 
+// Baldosa con el icono de la sección, teñida con su color
+function htmlIconoCategoria(catId, clase = '') {
+  const cat = infoCategoria(catId);
+  return `<span class="grupo-icono ${clase}" style="--color-cat:${cat.color}" aria-hidden="true">${ico(cat.icono || 'cat_otros')}</span>`;
+}
+
 function htmlCabeceraGrupo(catId, cuenta, plegable = false) {
   const cat = infoCategoria(catId);
   const contenido = `
-    <span class="grupo-marca" style="--color-cat:${cat.color}"></span>
-    <span>${esc(cat.nombre)}</span>
+    ${htmlIconoCategoria(catId)}
+    <span class="grupo-nombre">${esc(cat.nombre)}</span>
     <span class="grupo-cuenta">${cuenta}</span>
     ${plegable ? ico('chevron_abajo') : ''}
   `;
@@ -123,7 +129,10 @@ function renderizarListaRapida() {
 
   if (!lista.length) {
     cont.innerHTML = `
-      <div class="vacio-compacto">
+      <div class="vacio-compacto vacio-compra">
+        <div class="vacio-iconos" aria-hidden="true">
+          ${['Verduras y hortalizas', 'Lácteos y huevos', 'Panadería', 'Limpieza e higiene'].map(c => htmlIconoCategoria(c)).join('')}
+        </div>
         <p><strong>La lista está vacía.</strong> Escribe arriba lo que haga falta y pulsa intro. Puedes poner varias cosas a la vez separadas por comas, y la cantidad delante: «pan, 2 kg naranjas». Con ${ico('nota')} le añades instrucciones.</p>
         ${getCompra().some(i => !i.comprado) ? `
           <button class="boton boton-secundario boton-pequeno" data-accion="traerDeFija">${ico('fija')}Traer lo pendiente de la fija</button>` : ''}
@@ -159,11 +168,15 @@ function renderizarListaRapida() {
     `}
 
     ${alFinal && comprados.length ? `
-      <section class="grupo carro">
-        <div class="grupo-cabecera">
-          <span>En el carro</span>
-          <span class="grupo-cuenta">${comprados.length}</span>
-          ${pendientes.length ? '<button class="boton-texto" data-accion="vaciarCompradosRapida" style="margin-left:8px">Quitar</button>' : ''}
+      <section class="grupo carro ${getPref('carroPlegado', false) ? 'plegado' : ''}">
+        <div class="carro-cabecera">
+          <button class="grupo-cabecera" data-accion="plegarCarro" aria-expanded="${!getPref('carroPlegado', false)}">
+            <span class="grupo-icono grupo-icono-carro" aria-hidden="true">${ico('compra')}</span>
+            <span class="grupo-nombre">En el carro</span>
+            <span class="grupo-cuenta">${comprados.length}</span>
+            ${ico('chevron_abajo')}
+          </button>
+          ${pendientes.length ? '<button class="boton-texto" data-accion="vaciarCompradosRapida">Quitar</button>' : ''}
         </div>
         <div class="lista">${comprados.map(htmlFilaRapida).join('')}</div>
       </section>
@@ -175,11 +188,22 @@ function renderizarListaRapida() {
   recienAnadidos = new Set();
 }
 
-// "x6 · lo pidió Ana" / "cogido por Luis" (solo si lo hizo otra persona)
+// Una cantidad corta («2 kg», «x6») va como etiqueta a la derecha; una larga, debajo
+function cantidadCorta(i) {
+  const c = String(i.cantidad || '').trim();
+  return c && c.length <= 10 ? c : '';
+}
+
+function htmlCantidadEtiqueta(i) {
+  const c = cantidadCorta(i);
+  return c ? `<span class="producto-etiqueta">${esc(c)}</span>` : '';
+}
+
+// "lo pidió Ana" / "cogido por Luis" (solo si lo hizo otra persona) y la cantidad larga
 function detalleProducto(i) {
   const quien = i.comprado ? autorVisible(i.marcadoPor) : autorVisible(i.autor);
   const partes = [
-    i.cantidad && esc(i.cantidad),
+    !cantidadCorta(i) && i.cantidad && esc(i.cantidad),
     quien && `<span class="producto-autor">${i.comprado ? 'cogido por' : 'lo pidió'} ${esc(quien)}</span>`
   ].filter(Boolean);
   return partes.length ? `<span class="producto-cantidad">${partes.join(' · ')}</span>` : '';
@@ -201,6 +225,7 @@ function htmlFilaRapida(i) {
           ${detalleProducto(i)}
           ${htmlNotaProducto(i)}
         </span>
+        ${htmlCantidadEtiqueta(i)}
       </button>
       <button class="boton-icono pequeno" data-accion="quitarRapida" data-id="${esc(i.id)}" aria-label="Quitar ${esc(i.nombre)}">${ico('cerrar')}</button>
     </div>
@@ -307,6 +332,7 @@ function marcarRapida(id, el) {
   // Marcar al instante y recolocar un momento después (si no, el producto "salta")
   const fila = el.closest('.producto');
   fila.classList.toggle('marcado', item.comprado);
+  fila.classList.toggle('recien-marcado', item.comprado);
   el.setAttribute('aria-pressed', item.comprado);
   actualizarInsigniaCompra();
 
@@ -481,6 +507,7 @@ function htmlFilaFija(i) {
           ${detalleProducto(i)}
           ${htmlNotaProducto(i)}
         </span>
+        ${htmlCantidadEtiqueta(i)}
       </button>
       <button class="boton-icono pequeno" data-accion="editarFija" data-id="${esc(i.id)}" aria-label="Editar ${esc(i.nombre)}">${ico('editar')}</button>
     </div>
@@ -494,6 +521,7 @@ function marcarFija(id, el) {
   setColeccion('compra', lista);
   vibrar(item.comprado ? 10 : 5);
   el.closest('.producto').classList.toggle('marcado', item.comprado);
+  el.closest('.producto').classList.toggle('recien-marcado', item.comprado);
   el.setAttribute('aria-pressed', item.comprado);
 
   clearTimeout(tRenderRapida);
@@ -862,5 +890,12 @@ registrarAcciones({
     const grupo = el.closest('.grupo');
     grupo.classList.toggle('plegado', plegados.has(cat));
     el.setAttribute('aria-expanded', !plegados.has(cat));
+  },
+  // «En el carro» se puede plegar para que no ocupe en el súper
+  plegarCarro: (el) => {
+    const plegado = !getPref('carroPlegado', false);
+    setPref('carroPlegado', plegado);
+    el.closest('.grupo').classList.toggle('plegado', plegado);
+    el.setAttribute('aria-expanded', !plegado);
   }
 });

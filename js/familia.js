@@ -65,11 +65,13 @@ function actualizarChipFamilia() {
   // Caras de la familia a la derecha (si hay más gente aparte de ti) y los ajustes
   const miembros = f.miembros || [];
   const derecha = document.getElementById('barraDerecha');
+  // Como mucho tres huecos: tres caras, o dos y «+N» si sois más (así siempre caben)
+  const caras = miembros.length > 3 ? 2 : 3;
   derecha.innerHTML = `
     ${miembros.length > 1 ? `
       <button class="pila-avatares" data-accion="abrirFamilia" aria-label="${plural(miembros.length, 'miembro')} en la familia">
-        ${miembros.slice(0, 3).map(m => htmlAvatarMiembro(m)).join('')}
-        ${miembros.length > 3 ? `<span class="avatar avatar-mas">+${miembros.length - 3}</span>` : ''}
+        ${miembros.slice(0, caras).map(m => htmlAvatarMiembro(m)).join('')}
+        ${miembros.length > caras ? `<span class="avatar avatar-mas">+${miembros.length - caras}</span>` : ''}
       </button>` : ''}
     <button class="boton-icono" data-accion="abrirAjustes" aria-label="Ajustes" title="Ajustes">${ico('ajustes')}</button>
   `;

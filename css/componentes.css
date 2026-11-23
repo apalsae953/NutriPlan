@@ -365,7 +365,20 @@ select.entrada {
 
 .segmento {
   flex: 1;
+  min-width: 0; /* que encoja en pantallas estrechas en vez de salirse */
   position: relative;
+}
+
+.segmento span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Con cuatro opciones o más (Desayuno, Almuerzo…), algo más compacto */
+.segmentado:has(.segmento:nth-child(4)) .segmento span {
+  padding: 0 2px;
+  font-size: 13px;
 }
 
 .segmento input {
@@ -537,7 +550,22 @@ button.fila:active,
   background: var(--acento);
   box-shadow: none;
   color: var(--sobre-acento);
+}
+
+/* Solo al tocar (no cada vez que se repinta la lista): la casilla
+   rebota un poco y la marca se dibuja */
+.recien-marcado .casilla {
   animation: marcar .28s var(--ease-out);
+}
+
+.recien-marcado .casilla .ico path {
+  stroke-dasharray: 22;
+  animation: trazarMarca .3s var(--ease-out) .04s both;
+}
+
+@keyframes trazarMarca {
+  from { stroke-dashoffset: 22; }
+  to   { stroke-dashoffset: 0; }
 }
 
 @keyframes marcar {

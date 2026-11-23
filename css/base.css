@@ -200,6 +200,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-variant-numeric: tabular-nums;
+  /* Red de seguridad: si algo se pasara de ancho, que no aparezca
+     desplazamiento lateral (clip no rompe la barra pegajosa) */
+  overflow-x: clip;
 }
 
 img, svg {
@@ -310,12 +313,24 @@ p {
   margin: 0 auto;
   padding: 0 calc(var(--margen) - 6px);
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  /* Primero el nombre de la familia y lo de la derecha; el título del
+     centro usa lo que sobre. Nada puede ensanchar la barra más que la
+     pantalla: si no cabe, el nombre se corta con «…» */
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
 }
 
+#chipFamilia {
+  min-width: 0;
+}
+
 .barra-titulo {
+  min-width: 0;
+  max-width: 100%;
+  justify-self: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 16px;
   font-weight: 600;
   opacity: 0;
@@ -331,8 +346,10 @@ p {
 
 .barra-derecha {
   justify-self: end;
+  min-width: 0;
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
 }
 
 /* =========================================================

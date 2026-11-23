@@ -27,10 +27,10 @@
 }
 
 .chip-familia-nombre {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 34vw;
 }
 
 .chip-familia .ico {
@@ -409,7 +409,8 @@
    ========================================================= */
 .detalle-cifras {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr 1fr;
+  /* minmax(0, …) para que en móviles pequeños (o con letra grande) encojan en vez de salirse */
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--linea);
   border-radius: var(--r-m);
@@ -418,8 +419,10 @@
 }
 
 .detalle-cifra {
+  min-width: 0;
+  overflow-wrap: anywhere;
   background: var(--superficie-2);
-  padding: 12px 10px;
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -769,7 +772,7 @@
 }
 
 .sugerencia .ico {
-  color: var(--tinta-3);
+  color: var(--acento);
 }
 
 /* Progreso de la compra */
@@ -784,9 +787,9 @@
 
 .progreso-barra {
   flex: 1;
-  height: 6px;
+  height: 8px;
   border-radius: 999px;
-  background: var(--superficie-2);
+  background: var(--superficie-3);
   overflow: hidden;
 }
 
@@ -806,13 +809,42 @@
 .grupo-cabecera {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 4px 8px 2px;
-  font-size: 14px;
+  padding: 6px 4px 9px 0;
+  font-size: 15px;
   font-weight: 650;
-  color: var(--tinta-2);
+  color: var(--tinta);
   text-align: left;
+}
+
+/* Icono de la sección del súper, en una baldosa teñida con su color */
+.grupo-icono {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-cat);
+  background: color-mix(in srgb, var(--color-cat) 15%, var(--superficie));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-cat) 18%, transparent);
+}
+
+.grupo-icono .ico {
+  width: 18px;
+  height: 18px;
+}
+
+.grupo-icono-carro {
+  --color-cat: var(--acento);
+}
+
+.grupo-nombre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grupo-marca {
@@ -830,14 +862,15 @@
   color: var(--tinta-3);
 }
 
-.grupo-cabecera .ico {
+/* La flecha de plegar (no el icono de la sección) */
+.grupo-cabecera > .ico {
   width: 18px;
   height: 18px;
   color: var(--tinta-3);
   transition: transform .2s var(--ease-out);
 }
 
-.grupo.plegado .grupo-cabecera .ico {
+.grupo.plegado .grupo-cabecera > .ico {
   transform: rotate(-90deg);
 }
 
@@ -847,6 +880,7 @@
 
 /* Fila de producto */
 .producto {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -919,6 +953,45 @@
   color: var(--tinta-3);
 }
 
+/* Separadores que empiezan después de la casilla */
+.grupo .lista > .producto + .producto {
+  box-shadow: none;
+}
+
+.grupo .lista > .producto + .producto::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 52px;
+  right: 0;
+  height: 1px;
+  background: var(--linea);
+  transform: scaleY(.6);
+  transform-origin: top;
+}
+
+/* Cantidad corta como etiqueta a la derecha (2 kg, x6) */
+.producto-etiqueta {
+  flex-shrink: 0;
+  max-width: 40%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--tinta-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  transition: opacity .2s;
+}
+
+.producto.marcado .producto-etiqueta {
+  opacity: .55;
+}
+
 .producto-entrando {
   animation: entraProducto .32s var(--ease-out);
 }
@@ -928,10 +1001,51 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* En el carro */
+/* En el carro: más discreto y se puede plegar */
 .carro .lista {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--linea);
+}
+
+.carro-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.carro-cabecera .grupo-cabecera {
+  flex: 1;
+  min-width: 0;
+}
+
+.carro .grupo-cabecera {
+  color: var(--tinta-2);
+}
+
+/* Lista vacía: unas baldosas de secciones como ilustración */
+.vacio-iconos {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.vacio-iconos .grupo-icono {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+}
+
+.vacio-iconos .grupo-icono .ico {
+  width: 22px;
+  height: 22px;
+}
+
+.vacio-iconos .grupo-icono:nth-child(odd) {
+  transform: rotate(-4deg);
+}
+
+.vacio-iconos .grupo-icono:nth-child(even) {
+  transform: rotate(3deg) translateY(3px);
 }
 
 /* Fin de la compra */
@@ -1041,6 +1155,17 @@
 
 .pila-avatares .avatar + .avatar {
   margin-left: -9px;
+}
+
+/* En la barra de arriba, algo más pequeñas para que siempre quepan */
+.barra-derecha .pila-avatares {
+  flex-shrink: 0;
+}
+
+.barra-derecha .pila-avatares .avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12.5px;
 }
 
 .avatar-mas {
